@@ -1,0 +1,1959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salesforce Omni-Channel Routing Debugger</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f3f4f6;
+            --bg-tertiary: #e5e7eb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border: #d1d5db;
+            --accent: #0176d3;
+            --accent-hover: #014a8d;
+            --success: #2e844a;
+            --warning: #fe9339;
+            --error: #c23934;
+            --info: #0176d3;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #404040;
+            --text-primary: #e5e5e5;
+            --text-secondary: #a1a1a1;
+            --border: #525252;
+            --accent: #1a9bfc;
+            --accent-hover: #0d7cc1;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --error: #f87171;
+            --info: #60a5fa;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: var(--bg-primary);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            color: var(--accent);
+            font-size: 1.8rem;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .theme-toggle {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .section {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        h2 {
+            color: var(--text-primary);
+            font-size: 1.3rem;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        textarea, input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            resize: vertical;
+            transition: border-color 0.2s;
+        }
+
+        textarea:focus, input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        textarea {
+            min-height: 120px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: var(--accent-hover);
+        }
+
+        button.secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        button.secondary:hover {
+            background: var(--border);
+        }
+
+        .results {
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            border-left: 4px solid;
+        }
+
+        .alert-success {
+            background: rgba(46, 132, 74, 0.1);
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        .alert-warning {
+            background: rgba(254, 147, 57, 0.1);
+            border-color: var(--warning);
+            color: var(--warning);
+        }
+
+        .alert-error {
+            background: rgba(194, 57, 52, 0.1);
+            border-color: var(--error);
+            color: var(--error);
+        }
+
+        .alert-info {
+            background: rgba(1, 118, 211, 0.1);
+            border-color: var(--info);
+            color: var(--info);
+        }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .data-card {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .data-card-label {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .data-card-value {
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        .checklist {
+            list-style: none;
+        }
+
+        .checklist-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .checklist-item.pass {
+            background: rgba(46, 132, 74, 0.1);
+            border-left: 3px solid var(--success);
+        }
+
+        .checklist-item.fail {
+            background: rgba(194, 57, 52, 0.1);
+            border-left: 3px solid var(--error);
+        }
+
+        .checklist-item.warn {
+            background: rgba(254, 147, 57, 0.1);
+            border-left: 3px solid var(--warning);
+        }
+
+        .checklist-item.unknown {
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--border);
+        }
+
+        .icon {
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .flow-diagram {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            gap: 15px;
+        }
+
+        .flow-step-box {
+            padding: 15px 20px;
+            border-radius: 6px;
+            border: 2px solid var(--border);
+            background: var(--bg-primary);
+            min-width: 200px;
+            text-align: center;
+        }
+
+        .flow-step-box.current {
+            border-color: var(--accent);
+            background: rgba(1, 118, 211, 0.1);
+        }
+
+        .flow-step-box.success {
+            border-color: var(--success);
+            background: rgba(46, 132, 74, 0.1);
+        }
+
+        .flow-step-box.error {
+            border-color: var(--error);
+            background: rgba(194, 57, 52, 0.1);
+        }
+
+        .flow-arrow {
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        .code-block {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            position: relative;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            background: var(--bg-secondary);
+        }
+
+        .tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .accordion {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .accordion-header {
+            padding: 15px;
+            background: var(--bg-secondary);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .accordion-header:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .accordion-header.active {
+            background: var(--bg-tertiary);
+        }
+
+        .accordion-content {
+            padding: 15px;
+            display: none;
+            border-top: 1px solid var(--border);
+        }
+
+        .accordion-content.show {
+            display: block;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .badge-error {
+            background: var(--error);
+            color: white;
+        }
+
+        .badge-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .badge-info {
+            background: var(--info);
+            color: white;
+        }
+
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+            border-bottom: 1px dotted var(--text-secondary);
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 300px;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -150px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            border: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 1.4rem;
+            }
+
+            .data-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .auth-panel {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid var(--border);
+        }
+
+        .auth-panel.connected {
+            border-left-color: var(--success);
+        }
+
+        .auth-panel.error {
+            border-left-color: var(--error);
+        }
+
+        .auth-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .auth-row .input-group {
+            flex: 1;
+            min-width: 200px;
+            margin-bottom: 0;
+        }
+
+        .auth-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            padding: 8px 0;
+            color: var(--text-secondary);
+        }
+
+        .auth-status.ok { color: var(--success); }
+        .auth-status.err { color: var(--error); }
+
+        .run-live-btn {
+            background: var(--success);
+            font-size: 0.8rem;
+            padding: 6px 12px;
+            margin-left: 8px;
+        }
+
+        .run-live-btn:hover { background: #256b3a; }
+        .run-live-btn:disabled { background: var(--text-secondary); cursor: not-allowed; opacity: 0.6; }
+
+        .live-results {
+            margin-top: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            display: none;
+        }
+
+        .live-results.show { display: block; }
+
+        .live-results-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 0.82rem;
+        }
+
+        .live-results-table th {
+            background: var(--bg-tertiary);
+            padding: 8px;
+            text-align: left;
+            border: 1px solid var(--border);
+            font-weight: 600;
+        }
+
+        .live-results-table td {
+            padding: 7px 8px;
+            border: 1px solid var(--border);
+            word-break: break-word;
+        }
+
+        .live-results-table tr:nth-child(even) td {
+            background: var(--bg-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Salesforce Connection Panel -->
+        <div id="auth-panel" class="auth-panel">
+            <div class="section-header" style="margin-bottom: 12px;">
+                <h2>🔐 Salesforce Connection</h2>
+                <span id="auth-status" class="auth-status">Not connected</span>
+            </div>
+            <div class="auth-row">
+                <div class="input-group">
+                    <label>My Domain URL</label>
+                    <input type="text" id="instance-url" placeholder="https://myorg.my.salesforce.com" oninput="saveAuthConfig()">
+                </div>
+                <div class="input-group">
+                    <label>Connected App Client ID</label>
+                    <input type="text" id="client-id" placeholder="3MVG9..." oninput="saveAuthConfig()">
+                </div>
+                <button onclick="startOAuthFlow()" id="connect-btn">Connect to Salesforce</button>
+                <button class="secondary" onclick="disconnectOrg()" id="disconnect-btn" style="display:none">Disconnect</button>
+            </div>
+            <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <label style="margin: 0; white-space: nowrap; font-size: 0.8rem;">Callback URL to use in Connected App:</label>
+                <code id="callback-url-display" style="background: var(--bg-tertiary); padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; flex: 1; word-break: break-all;"></code>
+                <button class="secondary" style="padding: 4px 10px; font-size: 0.75rem;" onclick="copyToClipboard(document.getElementById('callback-url-display').textContent, this)">📋 Copy</button>
+            </div>
+            <details style="margin-top: 12px;">
+                <summary style="cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--accent); user-select: none;">
+                    One-time setup instructions ▸
+                </summary>
+                <div style="margin-top: 12px; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.8;">
+                    <p style="margin-bottom: 10px;">Complete these steps once in your Salesforce org, then enter the values above.</p>
+                    <ol style="margin-left: 20px;">
+                        <li style="margin-bottom: 8px;">
+                            <strong>Create a Connected App</strong> — Setup → App Manager → <em>New Connected App</em>
+                            <ul style="margin-left: 20px; margin-top: 4px;">
+                                <li>Check <em>Enable OAuth Settings</em></li>
+                                <li>Callback URL: <code id="callback-url-display" style="background: var(--bg-tertiary); padding: 2px 5px; border-radius: 3px;"></code></li>
+                                <li>OAuth Scopes: add <em>Access and manage your data (api)</em> and <em>Perform requests at any time (refresh_token)</em></li>
+                                <li>Check <em>Require Proof Key for Code Exchange (PKCE)</em></li>
+                                <li>Save, then copy the <strong>Consumer Key</strong> — that's your Client ID above</li>
+                            </ul>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>Allow CORS</strong> — Setup → Security → CORS → New
+                            <ul style="margin-left: 20px; margin-top: 4px;">
+                                <li>Origin URL: <code id="cors-url-display" style="background: var(--bg-tertiary); padding: 2px 5px; border-radius: 3px;"></code></li>
+                            </ul>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>Serve this file locally</strong> — the OAuth callback won't work from <code>file://</code>
+                            <ul style="margin-left: 20px; margin-top: 4px;">
+                                <li>In your terminal: <code style="background: var(--bg-tertiary); padding: 2px 5px; border-radius: 3px;">python3 -m http.server 8000</code> (from the folder containing this file)</li>
+                                <li>Then open: <code style="background: var(--bg-tertiary); padding: 2px 5px; border-radius: 3px;">http://localhost:8000/omni-channel-routing-debugger.html</code></li>
+                            </ul>
+                        </li>
+                    </ol>
+                </div>
+            </details>
+        </div>
+
+        <header>
+            <div>
+                <h1>🔍 Omni-Channel Routing Debugger</h1>
+                <div class="subtitle">Analyze why work items routed (or didn't route) the way they did</div>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()">🌓 Toggle Theme</button>
+        </header>
+
+        <!-- Input Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>📥 Input Data</h2>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('logs')">Logs</button>
+                <button class="tab" onclick="switchTab('records')">Record Details</button>
+                <button class="tab" onclick="switchTab('console')">Service Console</button>
+                <button class="tab" onclick="switchTab('live')">⚡ Live Data</button>
+            </div>
+
+            <div id="tab-logs" class="tab-content active">
+                <div class="input-group">
+                    <label>SCRT2 Splunk Logs</label>
+                    <textarea id="scrt2-logs" placeholder="Paste SCRT2 (scrt2-routing, scrt2-conversation) Splunk logs here...
+
+Example: `from_index_scrt2` [workItemId] earliest=... latest=..."></textarea>
+                </div>
+
+                <div class="input-group">
+                    <label>Core Splunk Logs</label>
+                    <textarea id="core-logs" placeholder="Paste Core instance logs here...
+
+Example: index=[INSTANCE] [orgId] [workItemId] earliest=... latest=..."></textarea>
+                </div>
+            </div>
+
+            <div id="tab-records" class="tab-content">
+                <div class="input-group">
+                    <label>PendingServiceRouting (PSR) Record</label>
+                    <textarea id="psr-record" placeholder="Paste PSR record details or SOQL query results...
+
+SELECT Id, QueueId, WorkItemId, IsPushed, IsTransfer, RoutingType, RoutingPriority, ServiceChannelId, IsReadyForRouting, CapacityWeight, PreferredUserId, IsStatusChangeInitiated, IsOwnerChangeInitiated FROM PendingServiceRouting WHERE WorkItemId = '...'"></textarea>
+                </div>
+
+                <div class="input-group">
+                    <label>AgentWork Record</label>
+                    <textarea id="agentwork-record" placeholder="Paste AgentWork record details...
+
+SELECT Id, UserId, WorkItemId, Status, CapacityWeight, CapacityPercentage, AcceptDateTime, DeclineDateTime FROM AgentWork WHERE WorkItemId = '...'"></textarea>
+                </div>
+
+                <div class="input-group">
+                    <label>Work Item Details</label>
+                    <textarea id="workitem-details" placeholder="Paste work item details (Case, Custom Object, etc.)...
+
+Include: Id, OwnerId, Status, Priority, Related Queue, Skills Required"></textarea>
+                </div>
+            </div>
+
+            <div id="tab-console" class="tab-content">
+                <div class="input-group">
+                    <label>Service Console Browser Logs</label>
+                    <textarea id="console-logs" placeholder="Paste browser console logs from Service Console...
+
+Look for: Omni errors, routing events, agent status changes"></textarea>
+                </div>
+
+                <div class="input-group">
+                    <label>Request ID / Conversation ID</label>
+                    <input type="text" id="request-id" placeholder="UUID from console logs or error messages">
+                </div>
+            </div>
+
+            <div id="tab-live" class="tab-content">
+                <div class="alert alert-info" style="margin-bottom: 15px;">
+                    Connect to Salesforce above, then run queries directly against your org. Results auto-populate the analysis fields.
+                </div>
+                <div class="input-group">
+                    <label>Work Item ID <span style="font-weight:400;">(Case, Custom Object, Conversation, etc.)</span></label>
+                    <input type="text" id="live-work-item-id" placeholder="e.g. 5001000000000001 or 0MwXX...">
+                </div>
+                <div class="button-group" style="margin-bottom: 20px;">
+                    <button onclick="fetchLiveData()" id="fetch-live-btn" disabled>⚡ Fetch Live Data</button>
+                </div>
+
+                <div id="live-psr-section" style="display:none;">
+                    <h3 style="margin-bottom: 8px; font-size: 1rem;">PendingServiceRouting</h3>
+                    <div id="live-psr-results" class="live-results show"></div>
+                </div>
+
+                <div id="live-aw-section" style="margin-top: 15px; display:none;">
+                    <h3 style="margin-bottom: 8px; font-size: 1rem;">AgentWork</h3>
+                    <div id="live-aw-results" class="live-results show"></div>
+                </div>
+
+                <div id="live-custom-section" style="margin-top: 15px;">
+                    <h3 style="margin-bottom: 8px; font-size: 1rem;">Custom SOQL Query</h3>
+                    <div class="input-group" style="margin-bottom: 8px;">
+                        <textarea id="live-custom-soql" style="min-height: 70px; font-family: 'Courier New', monospace;" placeholder="SELECT Id, Name FROM Account LIMIT 5"></textarea>
+                    </div>
+                    <button onclick="runCustomQuery()" id="run-custom-btn" disabled>Run Query</button>
+                    <div id="live-custom-results" class="live-results" style="margin-top: 8px;"></div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button onclick="analyzeRouting()">🔬 Analyze Routing</button>
+                <button class="secondary" onclick="clearInputs()">🗑️ Clear All</button>
+                <button class="secondary" onclick="loadExample()">📝 Load Example</button>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="results">
+            <!-- Summary -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>📊 Analysis Summary</h2>
+                </div>
+                <div id="summary-content"></div>
+            </div>
+
+            <!-- Routing Flow Diagram -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>🔄 Routing Flow</h2>
+                </div>
+                <div id="flow-diagram" class="flow-diagram"></div>
+            </div>
+
+            <!-- Extracted Data -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>📋 Extracted Data</h2>
+                </div>
+                <div id="extracted-data"></div>
+            </div>
+
+            <!-- Diagnostic Checklist -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>✅ Diagnostic Checklist</h2>
+                </div>
+                <ul id="checklist" class="checklist"></ul>
+            </div>
+
+            <!-- Common Issues -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>⚠️ Common Issues & Solutions</h2>
+                </div>
+                <div id="common-issues"></div>
+            </div>
+
+            <!-- Splunk Queries -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>🔍 Suggested Splunk Queries</h2>
+                </div>
+                <div id="splunk-queries"></div>
+            </div>
+
+            <!-- Next Steps -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>🎯 Next Steps</h2>
+                </div>
+                <div id="next-steps"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Theme toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+
+        // Clear inputs
+        function clearInputs() {
+            document.querySelectorAll('textarea, input[type="text"]').forEach(input => input.value = '');
+            document.getElementById('results').classList.remove('show');
+        }
+
+        // Load example data
+        function loadExample() {
+            document.getElementById('scrt2-logs').value = `{
+   level: INFO
+   logger: com.salesforce.scrt.v2.routing.controller.CoreupdateApiController
+   message: RoutingNotification: 00DPv00000BnIjp class RoutingNotification {
+    organizationId: 00DPv00000BnIjp
+    recordId: 0MwPv000009eA8L
+    pendingServiceRoutingId: null
+    channelData: {"eventId":"a5f6299e-22fe-45e2-a511-097284c630d2","routerParticipantSubject":"50bb861a-fdfa-4432-aced-316a3aed2512","routingType":"Conference","conversationId":"436ec502-c922-4773-87d0-3c67bf4a8ebb"}
+    errors: [OmniRoutingException : [Message = This work item couldn't be routed. Ask your Salesforce admin to review the routing logic.]]
+    reasonForNotRouting: null
+    routingConfig: null
+    estimatedWaitTime: null
+}
+   service: scrt2-routing
+   timestamp: 1770658695184
+}`;
+
+            document.getElementById('psr-record').value = `Id: 0JRbg000003qBAX
+WorkItemId: a3zbg0000003R5J
+QueueId: 00Gbg000001DVGj
+RoutingType: QUEUE_BASED
+IsPushed: false
+IsTransfer: false
+IsReadyForRouting: true
+ServiceChannelId: 0N9Ab000000000k`;
+
+            switchTab('logs');
+            document.querySelector('.tab').click();
+        }
+
+        // Main analysis function
+        function analyzeRouting() {
+            const scrt2Logs = document.getElementById('scrt2-logs').value;
+            const coreLogs = document.getElementById('core-logs').value;
+            const psrRecord = document.getElementById('psr-record').value;
+            const agentworkRecord = document.getElementById('agentwork-record').value;
+            const workitemDetails = document.getElementById('workitem-details').value;
+            const consoleLogs = document.getElementById('console-logs').value;
+            const requestId = document.getElementById('request-id').value;
+
+            // Extract data
+            const extractedData = extractData(scrt2Logs, coreLogs, psrRecord, agentworkRecord, workitemDetails, consoleLogs, requestId);
+
+            // Show results
+            document.getElementById('results').classList.add('show');
+
+            // Populate sections
+            displaySummary(extractedData);
+            displayFlowDiagram(extractedData);
+            displayExtractedData(extractedData);
+            displayChecklist(extractedData);
+            displayCommonIssues(extractedData);
+            displaySplunkQueries(extractedData);
+            displayNextSteps(extractedData);
+
+            // Scroll to results
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Extract data from inputs
+        function extractData(scrt2, core, psr, agentwork, workitem, console, requestId) {
+            const data = {
+                orgId: null,
+                workItemId: null,
+                psrId: null,
+                queueId: null,
+                userId: null,
+                conversationId: null,
+                routingType: null,
+                routingError: null,
+                isPushed: null,
+                isTransfer: null,
+                isConference: null,
+                serviceChannelId: null,
+                routingConfigId: null,
+                timestamp: null,
+                errors: [],
+                warnings: [],
+                hasEnhancedOmni: null,
+                agentStatus: null,
+                psrExists: null
+            };
+
+            // Extract from SCRT2 logs
+            if (scrt2) {
+                data.orgId = extractPattern(scrt2, /organizationId:\s*(\w+)/i);
+                data.workItemId = extractPattern(scrt2, /(?:recordId|workitemid|WorkItemId):\s*(\w+)/i);
+                data.psrId = extractPattern(scrt2, /PSR\s+(?:Inserted:\s+)?(?:ID:\s+)?(\w+)/i) ||
+                            extractPattern(scrt2, /pendingServiceRoutingId:\s*(\w+)/i);
+                data.queueId = extractPattern(scrt2, /Queue:\s*(\w+)/i) || extractPattern(scrt2, /QueueId:\s*(\w+)/i);
+                data.conversationId = extractPattern(scrt2, /conversationId[\"']:\s*[\"']([^\"']+)/i);
+                data.routingType = extractPattern(scrt2, /RoutingType:\s*(\w+)/i) ||
+                                  extractPattern(scrt2, /routingType[\"']:\s*[\"']([^\"']+)/i);
+
+                // Check for errors
+                const errorMatch = scrt2.match(/OmniRoutingException.*?\[Message\s*=\s*([^\]]+)\]/i);
+                if (errorMatch) {
+                    data.routingError = errorMatch[1].trim();
+                    data.errors.push(data.routingError);
+                }
+
+                // Check for other patterns
+                data.isPushed = extractPattern(scrt2, /IsPushed:\s*(true|false)/i);
+                data.isTransfer = extractPattern(scrt2, /IsTransfer:\s*(true|false)/i);
+                data.isConference = scrt2.toLowerCase().includes('conference');
+            }
+
+            // Extract from Core logs
+            if (core) {
+                data.orgId = data.orgId || extractPattern(core, /00D\w{12,15}/);
+                data.workItemId = data.workItemId || extractPattern(core, /\b[a-zA-Z0-9]{15,18}\b/);
+            }
+
+            // Extract from PSR record
+            if (psr) {
+                data.psrExists = true;
+                data.psrId = data.psrId || extractPattern(psr, /Id:\s*(\w+)/i);
+                data.workItemId = data.workItemId || extractPattern(psr, /WorkItemId:\s*(\w+)/i);
+                data.queueId = data.queueId || extractPattern(psr, /QueueId:\s*(\w+)/i);
+                data.routingType = data.routingType || extractPattern(psr, /RoutingType:\s*(\w+)/i);
+                data.isPushed = data.isPushed || extractPattern(psr, /IsPushed:\s*(true|false)/i);
+                data.isTransfer = data.isTransfer || extractPattern(psr, /IsTransfer:\s*(true|false)/i);
+                data.serviceChannelId = extractPattern(psr, /ServiceChannelId:\s*(\w+)/i);
+
+                const isReady = extractPattern(psr, /IsReadyForRouting:\s*(true|false)/i);
+                if (isReady === 'false') {
+                    data.warnings.push('PSR exists but IsReadyForRouting = false');
+                }
+            } else {
+                data.psrExists = false;
+                if (scrt2 && !scrt2.includes('PSR')) {
+                    data.warnings.push('No PSR record found - work item may not have been queued properly');
+                }
+            }
+
+            // Extract from AgentWork
+            if (agentwork) {
+                data.userId = extractPattern(agentwork, /UserId:\s*(\w+)/i);
+                data.agentStatus = extractPattern(agentwork, /Status:\s*(\w+)/i);
+            }
+
+            // Extract from console logs
+            if (console) {
+                data.requestId = requestId || extractPattern(console, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+            }
+
+            // Request ID override
+            if (requestId) {
+                data.requestId = requestId;
+            }
+
+            return data;
+        }
+
+        function extractPattern(text, pattern) {
+            const match = text.match(pattern);
+            return match ? match[1] : null;
+        }
+
+        // Display functions
+        function displaySummary(data) {
+            const container = document.getElementById('summary-content');
+            let html = '';
+
+            // Determine overall status
+            if (data.errors.length > 0) {
+                html += `<div class="alert alert-error">
+                    <strong>❌ Routing Failed:</strong> ${data.errors[0]}
+                </div>`;
+            } else if (data.warnings.length > 0) {
+                html += `<div class="alert alert-warning">
+                    <strong>⚠️ Potential Issues Detected:</strong> ${data.warnings.join(', ')}
+                </div>`;
+            } else if (data.agentStatus === 'Opened' || data.isPushed === 'true') {
+                html += `<div class="alert alert-success">
+                    <strong>✅ Routing Successful:</strong> Work item was routed to an agent.
+                </div>`;
+            } else {
+                html += `<div class="alert alert-info">
+                    <strong>ℹ️ Analysis Complete:</strong> See details below.
+                </div>`;
+            }
+
+            // Quick stats
+            html += `<div class="data-grid" style="margin-top: 15px;">`;
+
+            if (data.routingType) {
+                html += `<div class="data-card">
+                    <div class="data-card-label">Routing Type</div>
+                    <div class="data-card-value">${data.routingType}</div>
+                </div>`;
+            }
+
+            if (data.psrExists !== null) {
+                html += `<div class="data-card">
+                    <div class="data-card-label">PSR Status</div>
+                    <div class="data-card-value">${data.psrExists ? '✅ Exists' : '❌ Not Found'}</div>
+                </div>`;
+            }
+
+            if (data.isPushed) {
+                html += `<div class="data-card">
+                    <div class="data-card-label">Pushed to Agent</div>
+                    <div class="data-card-value">${data.isPushed === 'true' ? '✅ Yes' : '⏳ No'}</div>
+                </div>`;
+            }
+
+            if (data.isTransfer === 'true' || data.isConference) {
+                html += `<div class="data-card">
+                    <div class="data-card-label">Transfer/Conference</div>
+                    <div class="data-card-value">${data.isTransfer === 'true' ? '🔄 Transfer' : '📞 Conference'}</div>
+                </div>`;
+            }
+
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        function displayFlowDiagram(data) {
+            const container = document.getElementById('flow-diagram');
+            let html = '<div>';
+
+            // Determine flow based on data
+            const steps = [];
+
+            // Step 1: Work Item Created
+            steps.push({
+                label: 'Work Item Created',
+                status: 'success',
+                details: data.workItemId ? `ID: ${data.workItemId}` : ''
+            });
+
+            // Step 2: PSR Created
+            if (data.psrExists) {
+                steps.push({
+                    label: 'PSR Created',
+                    status: 'success',
+                    details: data.psrId ? `ID: ${data.psrId}` : ''
+                });
+            } else {
+                steps.push({
+                    label: 'PSR Creation',
+                    status: 'error',
+                    details: '❌ PSR not found'
+                });
+            }
+
+            // Step 3: Routing Configuration
+            if (data.errors.length === 0 && data.psrExists) {
+                steps.push({
+                    label: 'Routing Rules Applied',
+                    status: 'success',
+                    details: data.routingType || 'Type unknown'
+                });
+            } else if (data.errors.length > 0) {
+                steps.push({
+                    label: 'Routing Rules Check',
+                    status: 'error',
+                    details: '❌ Routing failed'
+                });
+            } else {
+                steps.push({
+                    label: 'Routing Rules',
+                    status: 'current',
+                    details: 'In progress'
+                });
+            }
+
+            // Step 4: Agent Assignment
+            if (data.isPushed === 'true' || data.agentStatus === 'Opened') {
+                steps.push({
+                    label: 'Assigned to Agent',
+                    status: 'success',
+                    details: data.userId ? `User: ${data.userId}` : '✅ Assigned'
+                });
+            } else if (data.errors.length > 0) {
+                steps.push({
+                    label: 'Agent Assignment',
+                    status: 'error',
+                    details: '❌ Not assigned'
+                });
+            } else {
+                steps.push({
+                    label: 'Agent Assignment',
+                    status: 'current',
+                    details: '⏳ Pending'
+                });
+            }
+
+            // Build flow
+            steps.forEach((step, index) => {
+                html += `
+                    <div class="flow-step">
+                        <div class="flow-step-box ${step.status}">
+                            <strong>${step.label}</strong>
+                            ${step.details ? `<div style="font-size: 0.85rem; margin-top: 5px; color: var(--text-secondary);">${step.details}</div>` : ''}
+                        </div>
+                        ${index < steps.length - 1 ? '<div class="flow-arrow">→</div>' : ''}
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function displayExtractedData(data) {
+            const container = document.getElementById('extracted-data');
+            let html = '<div class="data-grid">';
+
+            const fields = [
+                { key: 'orgId', label: 'Org ID' },
+                { key: 'workItemId', label: 'Work Item ID' },
+                { key: 'psrId', label: 'PSR ID' },
+                { key: 'queueId', label: 'Queue ID' },
+                { key: 'userId', label: 'User/Agent ID' },
+                { key: 'conversationId', label: 'Conversation ID' },
+                { key: 'requestId', label: 'Request ID' },
+                { key: 'serviceChannelId', label: 'Service Channel' },
+                { key: 'routingType', label: 'Routing Type' },
+                { key: 'routingConfigId', label: 'Routing Config' }
+            ];
+
+            fields.forEach(field => {
+                if (data[field.key]) {
+                    html += `
+                        <div class="data-card">
+                            <div class="data-card-label">${field.label}</div>
+                            <div class="data-card-value" style="font-size: 0.9rem;">${data[field.key]}</div>
+                        </div>
+                    `;
+                }
+            });
+
+            html += '</div>';
+            container.innerHTML = html || '<p style="color: var(--text-secondary);">No data extracted. Please provide logs or record details.</p>';
+        }
+
+        function displayChecklist(data) {
+            const container = document.getElementById('checklist');
+            const checks = [];
+
+            // PSR checks
+            if (data.psrExists === true) {
+                checks.push({ status: 'pass', text: 'PendingServiceRouting record exists', icon: '✅' });
+            } else if (data.psrExists === false) {
+                checks.push({ status: 'fail', text: 'PendingServiceRouting record is missing - work item not queued properly', icon: '❌' });
+            } else {
+                checks.push({ status: 'unknown', text: 'PendingServiceRouting record status unknown - need PSR query', icon: '❓' });
+            }
+
+            // Service Channel
+            if (data.serviceChannelId) {
+                checks.push({ status: 'pass', text: `Service Channel configured: ${data.serviceChannelId}`, icon: '✅' });
+            } else {
+                checks.push({ status: 'unknown', text: 'Service Channel not found in data - verify Service Channel setup', icon: '❓' });
+            }
+
+            // Queue
+            if (data.queueId) {
+                checks.push({ status: 'pass', text: `Queue identified: ${data.queueId}`, icon: '✅' });
+            } else if (data.routingType && data.routingType.includes('QUEUE')) {
+                checks.push({ status: 'warn', text: 'Queue-based routing but no Queue ID found', icon: '⚠️' });
+            }
+
+            // Routing Type
+            if (data.routingType) {
+                const isValid = ['QUEUE_BASED', 'SKILLS_BASED', 'EXTERNAL_ROUTING', 'Conference', 'Transfer'].includes(data.routingType);
+                checks.push({
+                    status: isValid ? 'pass' : 'warn',
+                    text: `Routing type: ${data.routingType}`,
+                    icon: isValid ? '✅' : '⚠️'
+                });
+            }
+
+            // Enhanced Omni
+            if (data.workItemId && data.workItemId.startsWith('0Mw')) {
+                checks.push({ status: 'pass', text: 'Enhanced Omni appears to be enabled (0Mw prefix)', icon: 'ℹ️' });
+            }
+
+            // Transfer/Conference
+            if (data.isTransfer === 'true') {
+                checks.push({ status: 'pass', text: 'This is a transfer scenario', icon: '🔄' });
+            }
+            if (data.isConference) {
+                checks.push({ status: 'pass', text: 'This is a conference scenario', icon: '📞' });
+            }
+
+            // Agent Assignment
+            if (data.isPushed === 'true') {
+                checks.push({ status: 'pass', text: 'Work item was pushed to an agent', icon: '✅' });
+            } else if (data.isPushed === 'false') {
+                checks.push({ status: 'warn', text: 'Work item not yet pushed to agent (may still be in queue)', icon: '⏳' });
+            }
+
+            // Errors
+            if (data.errors.length > 0) {
+                data.errors.forEach(error => {
+                    checks.push({ status: 'fail', text: `Error: ${error}`, icon: '❌' });
+                });
+            }
+
+            // Warnings
+            if (data.warnings.length > 0) {
+                data.warnings.forEach(warning => {
+                    checks.push({ status: 'warn', text: warning, icon: '⚠️' });
+                });
+            }
+
+            // Render
+            let html = '';
+            checks.forEach(check => {
+                html += `
+                    <li class="checklist-item ${check.status}">
+                        <span class="icon">${check.icon}</span>
+                        <span>${check.text}</span>
+                    </li>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function displayCommonIssues(data) {
+            const container = document.getElementById('common-issues');
+            const issues = [];
+
+            // Issue 1: Generic routing exception
+            if (data.routingError && data.routingError.includes("couldn't be routed")) {
+                issues.push({
+                    title: '"This work item couldn\'t be routed" Error',
+                    description: 'This generic error can be caused by multiple issues:',
+                    causes: [
+                        'Invalid or missing Routing Configuration',
+                        'Service Channel misconfiguration',
+                        'Enhanced Omni vs Standard Omni mismatch',
+                        'Skills-Based Routing Rules enabled when using Omni Flow',
+                        'Canceled conference/transfer invitation causing state issues',
+                        'Custom object not properly configured for omni-channel'
+                    ],
+                    solutions: [
+                        'Verify Routing Configuration is active and properly configured',
+                        'Check Service Channel is enabled for the object type',
+                        'Try toggling Enhanced Omni off and on (Setup > Omni-Channel Settings)',
+                        'If using Omni Flow, disable Skills-Based Routing Rules on the routing configuration',
+                        'For conference issues: see Known Issue <a href="https://gus.lightning.force.com/lightning/r/ADM_Work__c/a07EE00002JfAibYAF/view" target="_blank">W-16887847</a>',
+                        'Query PSR to see if it was created: SELECT * FROM PendingServiceRouting WHERE WorkItemId = \'[ID]\''
+                    ],
+                    references: ['W-16887847', 'KB: a02Ka00000lH8UUIA0']
+                });
+            }
+
+            // Issue 2: No PSR
+            if (data.psrExists === false) {
+                issues.push({
+                    title: 'PendingServiceRouting Record Not Created',
+                    description: 'Work item cannot route without a PSR record.',
+                    causes: [
+                        'Service Channel not configured for this object',
+                        'Routing rules not properly set up',
+                        'Work item not meeting criteria for routing',
+                        'Triggers or flows preventing PSR creation'
+                    ],
+                    solutions: [
+                        'Verify Service Channel exists for this object type',
+                        'Check debug logs for PSR insertion errors',
+                        'Verify routing is triggered (check workflows/flows)',
+                        'Ensure object has OwnerId field and proper queue setup'
+                    ]
+                });
+            }
+
+            // Issue 3: Enhanced Omni issues
+            if (data.warnings.some(w => w.includes('Enhanced')) || (data.errors.length > 0 && data.workItemId && data.workItemId.startsWith('0Mw'))) {
+                issues.push({
+                    title: 'Enhanced Omni Channel Issues',
+                    description: 'Custom objects or cases not routing after enabling Enhanced Omni.',
+                    causes: [
+                        'Work items created BEFORE Enhanced Omni was enabled',
+                        'Incompatibility between Enhanced Omni and certain configurations',
+                        'PSR records in invalid state after toggle'
+                    ],
+                    solutions: [
+                        'Try creating NEW work items after enabling Enhanced Omni',
+                        'Toggle Enhanced Omni off, route existing items, then re-enable',
+                        'File investigation if issue persists with new work items',
+                        'Check if only custom objects are affected or standard objects too'
+                    ],
+                    references: ['Related Investigation: aAHEE000001FDnZ4AW']
+                });
+            }
+
+            // Issue 4: Conference/Transfer
+            if (data.isConference || data.isTransfer === 'true') {
+                issues.push({
+                    title: 'Conference/Transfer Routing Failures',
+                    description: 'Conference invitations or transfers failing with routing exceptions.',
+                    causes: [
+                        'Canceling conference invitation before agent accepts',
+                        'Re-inviting same agent after cancellation',
+                        'State mismatch in SCRT2 routing layer'
+                    ],
+                    solutions: [
+                        'Wait for agent to accept/decline before taking action',
+                        'Use Queue transfer instead of Agent transfer as workaround',
+                        'Check for known bug W-16887847 fix rollout status',
+                        'Review SCRT2 logs for "Cancel Invitation" followed by routing error'
+                    ],
+                    references: ['W-16887847']
+                });
+            }
+
+            // Issue 5: Skills-Based Routing + Omni Flow
+            if (data.routingError && data.routingError.includes('Skills-Based Routing')) {
+                issues.push({
+                    title: 'Skills-Based Routing Rules Conflict with Omni Flow',
+                    description: 'Cannot use Route Work flow element with Skills-Based Routing Rules enabled.',
+                    causes: [
+                        'Routing Configuration has "Skills-Based Routing Rules" enabled',
+                        'Attempting to use Omni-Channel Flow with skills routing'
+                    ],
+                    solutions: [
+                        'Go to Routing Configuration setup',
+                        'Disable "Skills-Based Routing Rules" option',
+                        'Use "Add Skill Requirement" actions in flow instead',
+                        'OR use Apex for skills-based routing (not recommended by Product)'
+                    ]
+                });
+            }
+
+            // Render
+            let html = '';
+            if (issues.length === 0) {
+                html = '<p style="color: var(--text-secondary);">No specific common issues detected based on the provided data.</p>';
+                html += '<p style="color: var(--text-secondary); margin-top: 10px;">For general troubleshooting, see the checklist above and Splunk queries below.</p>';
+            } else {
+                issues.forEach((issue, index) => {
+                    html += `
+                        <div class="accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(${index})">
+                                <strong>${issue.title}</strong>
+                                <span id="accordion-icon-${index}">▼</span>
+                            </div>
+                            <div class="accordion-content" id="accordion-${index}">
+                                <p style="margin-bottom: 15px;">${issue.description}</p>
+
+                                ${issue.causes ? `
+                                    <p><strong>Possible Causes:</strong></p>
+                                    <ul style="margin-left: 20px; margin-bottom: 15px;">
+                                        ${issue.causes.map(c => `<li>${c}</li>`).join('')}
+                                    </ul>
+                                ` : ''}
+
+                                ${issue.solutions ? `
+                                    <p><strong>Solutions:</strong></p>
+                                    <ul style="margin-left: 20px; margin-bottom: 15px;">
+                                        ${issue.solutions.map(s => `<li>${s}</li>`).join('')}
+                                    </ul>
+                                ` : ''}
+
+                                ${issue.references ? `
+                                    <p><strong>References:</strong> ${issue.references.join(', ')}</p>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            container.innerHTML = html;
+        }
+
+        function toggleAccordion(index) {
+            const content = document.getElementById(`accordion-${index}`);
+            const icon = document.getElementById(`accordion-icon-${index}`);
+            const header = content.previousElementSibling;
+
+            content.classList.toggle('show');
+            header.classList.toggle('active');
+            icon.textContent = content.classList.contains('show') ? '▲' : '▼';
+        }
+
+        function displaySplunkQueries(data) {
+            const container = document.getElementById('splunk-queries');
+            let html = '';
+
+            const queries = [];
+
+            // SCRT2 queries
+            if (data.workItemId) {
+                queries.push({
+                    title: 'SCRT2: All events for Work Item',
+                    query: `\`from_index_scrt2\` ${data.workItemId}`,
+                    description: 'Shows all SCRT2 routing and conversation events for this work item'
+                });
+
+                queries.push({
+                    title: 'SCRT2: Errors and exceptions',
+                    query: `\`from_index_scrt2\` ${data.workItemId} *error* OR *exception* OR *failed*`,
+                    description: 'Filters for errors related to this work item'
+                });
+            }
+
+            if (data.conversationId) {
+                queries.push({
+                    title: 'SCRT2: Conversation events',
+                    query: `\`from_index_scrt2\` ${data.conversationId}`,
+                    description: 'Shows all events for this conversation'
+                });
+            }
+
+            if (data.userId) {
+                queries.push({
+                    title: 'SCRT2: Agent status events',
+                    query: `\`from_index_scrt2\` ${data.userId} "Successfully logged agent"`,
+                    description: 'Check if agent successfully logged in to Omni'
+                });
+            }
+
+            // Core queries
+            if (data.orgId && data.workItemId) {
+                queries.push({
+                    title: 'Core: PSR creation',
+                    query: `index=[INSTANCE] ${data.orgId} ${data.workItemId} "PSR Inserted"`,
+                    description: 'Look for PSR creation in core logs (replace [INSTANCE] with org instance)'
+                });
+            }
+
+            // Generic queries
+            queries.push({
+                title: 'SCRT2: Routing notifications',
+                query: `\`from_index_scrt2\` RoutingNotification ${data.workItemId || '[workItemId]'}`,
+                description: 'Shows routing notification events'
+            });
+
+            queries.push({
+                title: 'SCRT2: Agent assignment',
+                query: `\`from_index_scrt2\` ${data.workItemId || '[workItemId]'} "agent assigned" OR "agent accepted"`,
+                description: 'Check if work was assigned and accepted by an agent'
+            });
+
+            // Render queries
+            queries.forEach((q, index) => {
+                html += `
+                    <div class="accordion">
+                        <div class="accordion-header" onclick="toggleAccordion('query-${index}')">
+                            <strong>${q.title}</strong>
+                            <span id="accordion-icon-query-${index}">▼</span>
+                        </div>
+                        <div class="accordion-content" id="accordion-query-${index}">
+                            <p style="margin-bottom: 10px; color: var(--text-secondary);">${q.description}</p>
+                            <div class="code-block">
+                                <button class="copy-btn" onclick="copyToClipboard('${q.query.replace(/'/g, "\\'")}', this)">📋 Copy</button>
+                                <code>${q.query}</code>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // SOQL queries
+            html += '<h3 style="margin-top: 25px; margin-bottom: 15px;">SOQL Queries</h3>';
+
+            const soqlQueries = [];
+
+            if (data.workItemId) {
+                soqlQueries.push({
+                    title: 'Query PendingServiceRouting',
+                    query: `SELECT Id, QueueId, CreatedDate, WorkItemId, IsPushAttempted, ServiceChannelId, IsPushed, IsTransfer, RoutingModel, RoutingPriority, RoutingType, IsReadyForRouting, CapacityWeight, CapacityPercentage, PreferredUserId, IsStatusChangeInitiated, IsOwnerChangeInitiated, GroupId, SecondaryRoutingPriority, IsInterruptible FROM PendingServiceRouting WHERE WorkItemId = '${data.workItemId}'`,
+                    description: 'Get PSR details for the work item'
+                });
+
+                soqlQueries.push({
+                    title: 'Query AgentWork',
+                    query: `SELECT Id, UserId, WorkItemId, Status, CapacityWeight, CapacityPercentage, AcceptDateTime, DeclineDateTime, CloseDateTime FROM AgentWork WHERE WorkItemId = '${data.workItemId}'`,
+                    description: 'Check agent assignment and status'
+                });
+
+                soqlQueries.push({
+                    title: 'Query Work Item (Case example)',
+                    query: `SELECT Id, OwnerId, Status, Priority, Origin FROM Case WHERE Id = '${data.workItemId}'`,
+                    description: 'Get work item details (adjust object type as needed)'
+                });
+            }
+
+            if (data.queueId) {
+                soqlQueries.push({
+                    title: 'Query Queue Configuration',
+                    query: `SELECT Id, Name, DeveloperName, QueueRoutingConfigId FROM Group WHERE Id = '${data.queueId}'`,
+                    description: 'Get queue details and associated routing config'
+                });
+            }
+
+            soqlQueries.push({
+                title: 'Query Routing Configuration',
+                query: `SELECT Id, MasterLabel, DeveloperName, CapacityModel, RoutingModel, RoutingPriority, IsActive FROM QueueRoutingConfig ${data.queueId ? "WHERE Id IN (SELECT QueueRoutingConfigId FROM Group WHERE Id = '" + data.queueId + "')" : ""}`,
+                description: 'Get routing configuration details'
+            });
+
+            soqlQueries.push({
+                title: 'Query Service Channel',
+                query: `SELECT Id, MasterLabel, DeveloperName, RelatedEntity, CapacityModel, PushTimeout FROM ServiceChannel ${data.serviceChannelId ? "WHERE Id = '" + data.serviceChannelId + "'" : ""}`,
+                description: 'Get service channel configuration'
+            });
+
+            soqlQueries.forEach((q, index) => {
+                html += `
+                    <div class="accordion">
+                        <div class="accordion-header" onclick="toggleAccordion('soql-${index}')">
+                            <strong>${q.title}</strong>
+                            <span id="accordion-icon-soql-${index}">▼</span>
+                        </div>
+                        <div class="accordion-content" id="accordion-soql-${index}">
+                            <p style="margin-bottom: 10px; color: var(--text-secondary);">${q.description}</p>
+                            <div class="code-block">
+                                <button class="copy-btn" onclick="copyToClipboard(\`${q.query.replace(/`/g, "\\`")}\`, this)">📋 Copy</button>
+                                <code style="white-space: pre-wrap; word-break: break-all;">${q.query}</code>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function displayNextSteps(data) {
+            const container = document.getElementById('next-steps');
+            let html = '<ol style="margin-left: 20px; line-height: 2;">';
+
+            const steps = [];
+
+            // Based on findings, suggest next steps
+            if (data.psrExists === false) {
+                steps.push('Run the PSR SOQL query above to confirm PSR record is missing');
+                steps.push('Check Service Channel configuration for this object type');
+                steps.push('Review debug logs when work item is created to see PSR creation attempt');
+            } else if (data.errors.length > 0) {
+                steps.push('Review the Common Issues section above for this specific error');
+                steps.push('Run SCRT2 error query to see full error context in Splunk');
+                steps.push('Verify Routing Configuration is active and properly set up');
+                steps.push('Check if Enhanced Omni is enabled and if that affects routing');
+
+                if (data.isConference || data.isTransfer === 'true') {
+                    steps.push('Check GUS bug W-16887847 for conference/transfer error fixes');
+                }
+            } else if (data.isPushed === 'false') {
+                steps.push('Check if agents are available and online');
+                steps.push('Verify agent skills match work item requirements (if skills-based)');
+                steps.push('Check queue backlog to see if work item is waiting');
+                steps.push('Review capacity model and agent capacity settings');
+            } else {
+                steps.push('Run the SOQL queries above to gather more data');
+                steps.push('Check SCRT2 Splunk logs for the full routing timeline');
+                steps.push('Review Service Console browser logs for client-side issues');
+            }
+
+            // Always add these
+            steps.push('Document findings and share with team/customer');
+            steps.push('If issue persists, file a GUS investigation with all data gathered');
+
+            steps.forEach(step => {
+                html += `<li>${step}</li>`;
+            });
+
+            html += '</ol>';
+
+            html += `
+                <div class="alert alert-info" style="margin-top: 20px;">
+                    <strong>💡 Pro Tip:</strong> Always check both SCRT2 and Core logs, and verify PSR record exists.
+                    Most routing issues are configuration-related (Service Channel, Routing Config, Queue setup) rather than bugs.
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        function copyToClipboard(text, button) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.textContent;
+                button.textContent = '✅ Copied!';
+                setTimeout(() => {
+                    button.textContent = originalText;
+                }, 2000);
+            });
+        }
+
+        // ─── OAuth / Salesforce connection ────────────────────────────────────
+
+        const REDIRECT_URI = window.location.origin + window.location.pathname;
+
+        document.getElementById('callback-url-display').textContent = REDIRECT_URI;
+        document.getElementById('cors-url-display').textContent = window.location.origin;
+
+        // Restore saved config
+        (function restoreAuthConfig() {
+            const saved = JSON.parse(localStorage.getItem('sf_auth_config') || '{}');
+            if (saved.instanceUrl) document.getElementById('instance-url').value = saved.instanceUrl;
+            if (saved.clientId)   document.getElementById('client-id').value   = saved.clientId;
+        })();
+
+        function saveAuthConfig() {
+            localStorage.setItem('sf_auth_config', JSON.stringify({
+                instanceUrl: document.getElementById('instance-url').value.trim(),
+                clientId:    document.getElementById('client-id').value.trim()
+            }));
+        }
+
+        // PKCE helpers
+        function base64urlEncode(buf) {
+            return btoa(String.fromCharCode(...new Uint8Array(buf)))
+                .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+
+        async function generatePKCE() {
+            const verifier = base64urlEncode(crypto.getRandomValues(new Uint8Array(32)));
+            const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+            const challenge = base64urlEncode(digest);
+            return { verifier, challenge };
+        }
+
+        async function startOAuthFlow() {
+            const instanceUrl = document.getElementById('instance-url').value.trim();
+            const clientId    = document.getElementById('client-id').value.trim();
+
+            if (!instanceUrl || !clientId) {
+                setAuthStatus('err', 'Enter My Domain URL and Client ID first');
+                return;
+            }
+
+            const { verifier, challenge } = await generatePKCE();
+            sessionStorage.setItem('sf_pkce_verifier', verifier);
+            sessionStorage.setItem('sf_pending_instance', instanceUrl);
+            sessionStorage.setItem('sf_pending_client_id', clientId);
+
+            const params = new URLSearchParams({
+                response_type:         'code',
+                client_id:             clientId,
+                redirect_uri:          REDIRECT_URI,
+                scope:                 'api refresh_token',
+                code_challenge:        challenge,
+                code_challenge_method: 'S256'
+            });
+
+            window.location.href = `${instanceUrl}/services/oauth2/authorize?${params}`;
+        }
+
+        async function handleOAuthCallback() {
+            const params   = new URLSearchParams(window.location.search);
+            const code     = params.get('code');
+            const errorMsg = params.get('error_description') || params.get('error');
+
+            if (errorMsg) {
+                setAuthStatus('err', `OAuth error: ${decodeURIComponent(errorMsg)}`);
+                history.replaceState({}, '', window.location.pathname);
+                return;
+            }
+
+            if (!code) return;
+
+            // Clean URL immediately
+            history.replaceState({}, '', window.location.pathname);
+
+            const verifier   = sessionStorage.getItem('sf_pkce_verifier');
+            const instanceUrl = sessionStorage.getItem('sf_pending_instance');
+            const clientId   = sessionStorage.getItem('sf_pending_client_id');
+
+            if (!verifier || !instanceUrl || !clientId) {
+                setAuthStatus('err', 'OAuth state lost. Please try connecting again.');
+                return;
+            }
+
+            setAuthStatus('', 'Exchanging code for token…');
+
+            try {
+                const body = new URLSearchParams({
+                    grant_type:    'authorization_code',
+                    code,
+                    redirect_uri:  REDIRECT_URI,
+                    client_id:     clientId,
+                    code_verifier: verifier
+                });
+
+                const resp = await fetch(`${instanceUrl}/services/oauth2/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body
+                });
+
+                const token = await resp.json();
+
+                if (token.error) {
+                    throw new Error(token.error_description || token.error);
+                }
+
+                sessionStorage.removeItem('sf_pkce_verifier');
+                sessionStorage.removeItem('sf_pending_instance');
+                sessionStorage.removeItem('sf_pending_client_id');
+
+                localStorage.setItem('sf_token', JSON.stringify({
+                    accessToken:  token.access_token,
+                    refreshToken: token.refresh_token,
+                    instanceUrl:  token.instance_url || instanceUrl
+                }));
+
+                document.getElementById('instance-url').value = token.instance_url || instanceUrl;
+                saveAuthConfig();
+                renderConnected(token.instance_url || instanceUrl);
+
+            } catch (e) {
+                setAuthStatus('err', `Token exchange failed: ${e.message}`);
+            }
+        }
+
+        async function refreshAccessToken() {
+            const stored = JSON.parse(localStorage.getItem('sf_token') || 'null');
+            if (!stored || !stored.refreshToken) return null;
+
+            const clientId = document.getElementById('client-id').value.trim() ||
+                             JSON.parse(localStorage.getItem('sf_auth_config') || '{}').clientId;
+
+            const body = new URLSearchParams({
+                grant_type:    'refresh_token',
+                refresh_token: stored.refreshToken,
+                client_id:     clientId
+            });
+
+            const resp = await fetch(`${stored.instanceUrl}/services/oauth2/token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body
+            });
+
+            const token = await resp.json();
+            if (token.error) return null;
+
+            stored.accessToken = token.access_token;
+            localStorage.setItem('sf_token', JSON.stringify(stored));
+            return token.access_token;
+        }
+
+        function getStoredToken() {
+            return JSON.parse(localStorage.getItem('sf_token') || 'null');
+        }
+
+        function renderConnected(instanceUrl) {
+            document.getElementById('auth-panel').classList.add('connected');
+            document.getElementById('auth-panel').classList.remove('error');
+            setAuthStatus('ok', `Connected: ${instanceUrl}`);
+            document.getElementById('connect-btn').style.display = 'none';
+            document.getElementById('disconnect-btn').style.display = '';
+            document.getElementById('fetch-live-btn').disabled = false;
+            document.getElementById('run-custom-btn').disabled = false;
+        }
+
+        function setAuthStatus(type, msg) {
+            const el = document.getElementById('auth-status');
+            el.className = 'auth-status' + (type ? ' ' + type : '');
+            el.textContent = msg;
+        }
+
+        function disconnectOrg() {
+            localStorage.removeItem('sf_token');
+            document.getElementById('auth-panel').classList.remove('connected', 'error');
+            setAuthStatus('', 'Not connected');
+            document.getElementById('connect-btn').style.display = '';
+            document.getElementById('disconnect-btn').style.display = 'none';
+            document.getElementById('fetch-live-btn').disabled = true;
+            document.getElementById('run-custom-btn').disabled = true;
+        }
+
+        // On load: restore connected state or handle callback
+        (function initAuth() {
+            const token = getStoredToken();
+            if (token) {
+                renderConnected(token.instanceUrl);
+            } else {
+                handleOAuthCallback();
+            }
+        })();
+
+        // ─── Live data fetching ───────────────────────────────────────────────
+
+        async function sfQuery(soql) {
+            let token = getStoredToken();
+            if (!token) throw new Error('Not connected to Salesforce');
+
+            const url = `${token.instanceUrl}/services/data/v62.0/query?q=${encodeURIComponent(soql)}`;
+
+            let resp = await fetch(url, {
+                headers: { Authorization: `Bearer ${token.accessToken}` }
+            });
+
+            if (resp.status === 401) {
+                const newToken = await refreshAccessToken();
+                if (!newToken) throw new Error('Session expired. Please reconnect.');
+                token = getStoredToken();
+                resp = await fetch(url, {
+                    headers: { Authorization: `Bearer ${token.accessToken}` }
+                });
+            }
+
+            const data = await resp.json();
+            if (data.errorCode) throw new Error(`${data.errorCode}: ${data.message}`);
+            return data;
+        }
+
+        function renderQueryTable(records) {
+            if (!records || records.length === 0) return '<em>No records found.</em>';
+            const cols = Object.keys(records[0]).filter(k => k !== 'attributes');
+            let html = '<table class="live-results-table"><thead><tr>';
+            cols.forEach(c => { html += `<th>${c}</th>`; });
+            html += '</tr></thead><tbody>';
+            records.forEach(r => {
+                html += '<tr>';
+                cols.forEach(c => {
+                    const v = r[c];
+                    html += `<td>${v === null || v === undefined ? '' : v}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            return html;
+        }
+
+        async function fetchLiveData() {
+            const workItemId = document.getElementById('live-work-item-id').value.trim();
+            if (!workItemId) { alert('Enter a Work Item ID first.'); return; }
+
+            const btn = document.getElementById('fetch-live-btn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Fetching…';
+
+            try {
+                // PSR query
+                const psrSoql = `SELECT Id, QueueId, WorkItemId, IsPushAttempted, ServiceChannelId, IsPushed, IsTransfer, RoutingModel, RoutingPriority, RoutingType, IsReadyForRouting, CapacityWeight, CapacityPercentage, PreferredUserId, IsStatusChangeInitiated, IsOwnerChangeInitiated FROM PendingServiceRouting WHERE WorkItemId = '${workItemId}'`;
+                const psrData = await sfQuery(psrSoql);
+
+                document.getElementById('live-psr-section').style.display = '';
+                document.getElementById('live-psr-results').innerHTML = renderQueryTable(psrData.records);
+
+                // Auto-populate PSR textarea
+                if (psrData.records.length > 0) {
+                    const r = psrData.records[0];
+                    document.getElementById('psr-record').value = Object.entries(r)
+                        .filter(([k]) => k !== 'attributes')
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join('\n');
+                }
+
+                // AgentWork query
+                const awSoql = `SELECT Id, UserId, WorkItemId, Status, CapacityWeight, CapacityPercentage, AcceptDateTime, DeclineDateTime, CloseDateTime FROM AgentWork WHERE WorkItemId = '${workItemId}' ORDER BY CreatedDate DESC LIMIT 10`;
+                const awData = await sfQuery(awSoql);
+
+                document.getElementById('live-aw-section').style.display = '';
+                document.getElementById('live-aw-results').innerHTML = renderQueryTable(awData.records);
+
+                // Auto-populate AgentWork textarea
+                if (awData.records.length > 0) {
+                    const r = awData.records[0];
+                    document.getElementById('agentwork-record').value = Object.entries(r)
+                        .filter(([k]) => k !== 'attributes')
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join('\n');
+                }
+
+                setAuthStatus('ok', `Fetched at ${new Date().toLocaleTimeString()}`);
+
+            } catch (e) {
+                setAuthStatus('err', e.message);
+                if (e.message.includes('reconnect')) disconnectOrg();
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '⚡ Fetch Live Data';
+            }
+        }
+
+        async function runCustomQuery() {
+            const soql = document.getElementById('live-custom-soql').value.trim();
+            if (!soql) return;
+
+            const btn = document.getElementById('run-custom-btn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Running…';
+
+            const resultsEl = document.getElementById('live-custom-results');
+            resultsEl.classList.add('show');
+            resultsEl.innerHTML = 'Running query…';
+
+            try {
+                const data = await sfQuery(soql);
+                resultsEl.innerHTML = renderQueryTable(data.records);
+                resultsEl.style.fontFamily = '';
+                setAuthStatus('ok', `${data.totalSize} record(s) returned`);
+            } catch (e) {
+                resultsEl.innerHTML = `<span style="color: var(--error);">Error: ${e.message}</span>`;
+                setAuthStatus('err', e.message);
+                if (e.message.includes('reconnect')) disconnectOrg();
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Run Query';
+            }
+        }
+    </script>
+</body>
+</html>
