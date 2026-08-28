@@ -1,3 +1,8 @@
+// ─── GET /api/agents?q=... ────────────────────────────────────────────────────
+// Typeahead endpoint for searching active Salesforce users.
+// Used by CorrectionPanel's "Specific Agent" selector.
+// Returns up to 20 matching users as [{ id, name }].
+
 import { NextRequest, NextResponse } from "next/server";
 import { getOrgOrThrow } from "@/lib/session";
 import { listAgents } from "@/lib/sf-queries";

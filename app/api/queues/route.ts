@@ -1,3 +1,8 @@
+// ─── GET /api/queues?q=... ────────────────────────────────────────────────────
+// Typeahead endpoint for searching Salesforce queues (Group records with Type = Queue).
+// Used by CorrectionPanel's "Specific Queue" selector.
+// Returns up to 20 matching queues as [{ id, name }].
+
 import { NextRequest, NextResponse } from "next/server";
 import { getOrgOrThrow } from "@/lib/session";
 import { listQueues } from "@/lib/sf-queries";

@@ -4,9 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { WorkItemRow } from "@/lib/types";
 import { formatDate, formatDuration } from "@/lib/utils";
-import { getValidations, clearValidations } from "@/lib/validations";
+import { getValidations, getFlagged, clearValidations } from "@/lib/validations";
 
-type SortKey = keyof Pick<WorkItemRow, "channelLabel" | "queueName" | "agentName" | "routingModel" | "routingType" | "status" | "createdDate" | "timeToAcceptSeconds">;
+type DirectSortKey = keyof Pick<WorkItemRow, "workItemRef" | "channelLabel" | "queueName" | "agentName" | "routingType" | "status" | "createdDate" | "timeToAcceptSeconds">;
+type CustomerSortKey = "caseNumber" | "contactName" | "phone";
+type SortKey = DirectSortKey | CustomerSortKey;
 type SortDir = "asc" | "desc";
 
 const ROUTING_TYPE_LABELS: Record<string, { label: string; color: string }> = {
@@ -27,10 +29,17 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
   return <span className="ml-1 text-brand-400">{sortDir === "asc" ? "↑" : "↓"}</span>;
 }
 
+const CUSTOMER_KEYS = new Set<SortKey>(["caseNumber", "contactName", "phone"]);
+
+function getValue(item: WorkItemRow, key: SortKey): string {
+  if (CUSTOMER_KEYS.has(key)) return (item.customer?.[key as CustomerSortKey] ?? "");
+  return ((item[key as DirectSortKey] ?? "") as string | number).toString();
+}
+
 function sortRows(rows: WorkItemRow[], key: SortKey, dir: SortDir): WorkItemRow[] {
   return [...rows].sort((a, b) => {
-    const av = a[key] ?? "";
-    const bv = b[key] ?? "";
+    const av = getValue(a, key);
+    const bv = getValue(b, key);
     const cmp = av < bv ? -1 : av > bv ? 1 : 0;
     return dir === "asc" ? cmp : -cmp;
   });
@@ -41,13 +50,17 @@ export default function WorkItemsPage() {
   const [items, setItems] = useState<WorkItemRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [days, setDays] = useState(7);
+  const [days, setDays] = useState(() => {
+    if (typeof window === "undefined") return 7;
+    return Number(localStorage.getItem("rc-days-filter") ?? 7);
+  });
   const [search, setSearch] = useState("");
   const [orgLabel, setOrgLabel] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("createdDate");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [validatedIds, setValidatedIds] = useState<Set<string>>(new Set());
+  const [flaggedIds, setFlaggedIds] = useState<Set<string>>(new Set());
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -56,7 +69,12 @@ export default function WorkItemsPage() {
       const params = new URLSearchParams({ days: String(days) });
       const res = await fetch(`/api/work-items?${params}`);
       if (res.status === 401) { router.push("/connect"); return; }
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        const text = await res.text();
+        let msg = `Request failed (${res.status})`;
+        try { msg = JSON.parse(text).error ?? msg; } catch { /* HTML error page */ }
+        throw new Error(msg);
+      }
       setItems(await res.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load work items");
@@ -74,7 +92,7 @@ export default function WorkItemsPage() {
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  useEffect(() => { setValidatedIds(getValidations()); }, []);
+  useEffect(() => { setValidatedIds(getValidations()); setFlaggedIds(getFlagged()); }, []);
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -94,23 +112,28 @@ export default function WorkItemsPage() {
   const q = search.trim().toLowerCase();
   const filtered = q
     ? items.filter(item =>
+        item.customerLabel?.toLowerCase().includes(q) ||
         item.channelLabel?.toLowerCase().includes(q) ||
         item.queueName?.toLowerCase().includes(q) ||
         item.agentName?.toLowerCase().includes(q) ||
-        item.routingModel?.toLowerCase().includes(q) ||
-        item.status?.toLowerCase().includes(q)
+        item.routingType?.toLowerCase().includes(q) ||
+        item.status?.toLowerCase().includes(q) ||
+        item.workItemRef?.toLowerCase().includes(q)
       )
     : items;
   const sorted = sortRows(filtered, sortKey, sortDir);
 
   const columns: { key: SortKey; label: string }[] = [
-    { key: "channelLabel",       label: "Channel" },
-    { key: "queueName",          label: "Queue" },
-    { key: "agentName",          label: "Agent" },
-    { key: "routingModel",       label: "Routing Model" },
-    { key: "routingType",        label: "Routing Method" },
-    { key: "status",             label: "Status" },
-    { key: "createdDate",        label: "Created" },
+    { key: "workItemRef",         label: "Ref" },
+    { key: "caseNumber",          label: "Case" },
+    { key: "contactName",         label: "Contact" },
+    { key: "phone",               label: "Phone" },
+    { key: "channelLabel",        label: "Channel" },
+    { key: "queueName",           label: "Queue" },
+    { key: "agentName",           label: "Agent" },
+    { key: "routingType",         label: "Routing Type" },
+    { key: "status",              label: "Status" },
+    { key: "createdDate",         label: "Created" },
     { key: "timeToAcceptSeconds", label: "Time to Accept" },
   ];
 
@@ -156,7 +179,7 @@ export default function WorkItemsPage() {
             </button>
           )}
         </div>
-        <select value={days} onChange={(e) => setDays(Number(e.target.value))}
+        <select value={days} onChange={(e) => { const v = Number(e.target.value); setDays(v); localStorage.setItem("rc-days-filter", String(v)); }}
           className="border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value={1}>Last 24 hours</option>
           <option value={7}>Last 7 days</option>
@@ -166,9 +189,9 @@ export default function WorkItemsPage() {
           className="bg-brand-500 hover:bg-brand-600 text-white text-sm px-4 py-1.5 rounded-lg transition-colors">
           Refresh
         </button>
-        {validatedIds.size > 0 && (
+        {(validatedIds.size > 0 || flaggedIds.size > 0) && (
           <button
-            onClick={() => { clearValidations(); setValidatedIds(new Set()); }}
+            onClick={() => { clearValidations(); setValidatedIds(new Set()); setFlaggedIds(new Set()); }}
             className="text-xs text-slate-400 hover:text-red-400 transition-colors self-center">
             Reset validations
           </button>
@@ -186,13 +209,10 @@ export default function WorkItemsPage() {
           {q ? `No work items match "${search}"` : "No work items found for the selected time range."}
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm">
-          <table className="w-full text-sm">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-x-auto">
+          <table className="min-w-max w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
               <tr>
-                <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide px-4 py-3 select-none whitespace-nowrap">
-                  Ref
-                </th>
                 {columns.map(({ key, label }) => (
                   <th key={key}
                     onClick={() => handleSort(key)}
@@ -216,6 +236,15 @@ export default function WorkItemsPage() {
                         {item.workItemType.slice(0,1)}·{item.workItemRef}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                      {item.customer?.caseNumber ?? <span className="text-slate-300 dark:text-slate-600">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300 max-w-[120px] truncate">
+                      {item.customer?.contactName ?? <span className="text-slate-300 dark:text-slate-600">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                      {item.customer?.phone ?? <span className="text-slate-300 dark:text-slate-600">—</span>}
+                    </td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{item.channelLabel}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{item.queueName}</td>
                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">
@@ -223,11 +252,9 @@ export default function WorkItemsPage() {
                       {validatedIds.has(item.id) && (
                         <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400">✓ validated</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                        {item.routingModel}
-                      </span>
+                      {flaggedIds.has(item.id) && (
+                        <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400">✗ misrouted</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badge.color}`}>

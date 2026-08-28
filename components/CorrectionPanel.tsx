@@ -1,5 +1,13 @@
 "use client";
 
+// ─── CorrectionPanel ──────────────────────────────────────────────────────────
+// Form where the admin describes how a work item should have routed.
+// The admin picks a target type (specific agent, specific queue, or skills-based),
+// selects the intended target via typeahead, adds an optional reason,
+// then submits to /api/suggest to get configuration recommendations.
+//
+// The reason field shows a reminder not to include customer names or case details.
+
 import { useState, useEffect, useRef } from "react";
 import { CorrectionInput, AgentOption, QueueOption } from "@/lib/types";
 
@@ -11,6 +19,10 @@ interface Props {
   error: string | null;
 }
 
+// ─── useTypeahead ─────────────────────────────────────────────────────────────
+// Debounced typeahead hook that fetches suggestions from an API endpoint.
+// Only fires when `active` is true (i.e. the parent field is visible).
+// Debounce delay: 300ms to avoid hammering the SF API on every keystroke.
 function useTypeahead<T extends { id: string; name: string }>(endpoint: string, active: boolean) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<T[]>([]);
@@ -19,6 +31,7 @@ function useTypeahead<T extends { id: string; name: string }>(endpoint: string, 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    // Don't fetch if inactive, empty, or user just selected an item (query === selected.name)
     if (!active || !query || selected?.name === query) { setResults([]); return; }
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
@@ -27,6 +40,7 @@ function useTypeahead<T extends { id: string; name: string }>(endpoint: string, 
     }, 300);
   }, [query, selected, endpoint, active]);
 
+  // Called when the user clicks a result — locks in the selection
   function choose(item: T) {
     setSelected(item);
     setQuery(item.name);
@@ -34,6 +48,7 @@ function useTypeahead<T extends { id: string; name: string }>(endpoint: string, 
     setOpen(false);
   }
 
+  // Called when the X button is clicked — resets the field
   function clear() {
     setSelected(null);
     setQuery("");
@@ -44,11 +59,15 @@ function useTypeahead<T extends { id: string; name: string }>(endpoint: string, 
   return { query, setQuery, results, selected, open, setOpen, choose, clear };
 }
 
+// ─── CorrectionPanel ─────────────────────────────────────────────────────────
+
 export default function CorrectionPanel({ onSubmit, loading, error }: Props) {
   const [targetType, setTargetType] = useState<TargetType | null>(null);
   const [reason, setReason] = useState("");
+  // Skills-based routing tab only shown when org has Skills configured
   const [skillsEnabled, setSkillsEnabled] = useState(false);
 
+  // Check whether skills are configured in this org on mount
   useEffect(() => {
     fetch("/api/org/capabilities")
       .then(r => r.ok ? r.json() : { skillsEnabled: false })
@@ -56,10 +75,12 @@ export default function CorrectionPanel({ onSubmit, loading, error }: Props) {
       .catch(() => setSkillsEnabled(false));
   }, []);
 
+  // Each typeahead is only active when its tab is selected
   const agent = useTypeahead<AgentOption>("/api/agents", targetType === "agent");
   const queue = useTypeahead<QueueOption>("/api/queues", targetType === "queue");
   const [skillsNote, setSkillsNote] = useState("");
 
+  // Switching tabs clears the previous selection
   function handleTypeChange(type: TargetType) {
     setTargetType(type);
     agent.clear();
@@ -76,12 +97,14 @@ export default function CorrectionPanel({ onSubmit, loading, error }: Props) {
       targetAgentName: targetType === "agent" ? agent.selected?.name : undefined,
       targetQueueId: targetType === "queue" ? queue.selected?.id : undefined,
       targetQueueName: targetType === "queue" ? queue.selected?.name : undefined,
+      // For skills tab, merge the skills note into the reason field
       reason: targetType === "skills"
         ? `Skills-based routing issue. ${skillsNote}`.trim()
         : reason || undefined,
     });
   }
 
+  // Submit button is only enabled once a valid selection is made
   const canSubmit =
     (targetType === "agent" && !!agent.selected) ||
     (targetType === "queue" && !!queue.selected) ||
@@ -100,10 +123,11 @@ export default function CorrectionPanel({ onSubmit, loading, error }: Props) {
 
       <form onSubmit={handleSubmit} className="space-y-4">
 
-        {/* Target type selector */}
+        {/* Tab selector: Specific Agent | Specific Queue | Skills-based */}
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Intended routing target</label>
           <div className="flex gap-2">
+            {/* Skills tab only shown when org has skills configured */}
             {(["agent", "queue", ...(skillsEnabled ? ["skills"] : [])] as TargetType[]).map((type) => (
               <button
                 key={type}
@@ -121,7 +145,7 @@ export default function CorrectionPanel({ onSubmit, loading, error }: Props) {
           </div>
         </div>
 
-        {/* Agent typeahead */}
+        {/* Agent typeahead — shown when "Specific Agent" is selected */}
         {targetType === "agent" && (
           <div className="relative">
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Target Agent</label>
@@ -137,6 +161,7 @@ export default function CorrectionPanel({ onSubmit, loading, error }: Props) {
             {agent.open && agent.results.length > 0 && (
               <ul className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg shadow-lg max-h-48 overflow-auto">
                 {agent.results.map((a) => (
+                  // onMouseDown fires before onBlur so the click registers before the dropdown closes
                   <li key={a.id} onMouseDown={() => agent.choose(a)}
                     className="px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-brand-50 dark:hover:bg-brand-900/30 cursor-pointer">
                     {a.name}
@@ -151,7 +176,7 @@ export default function CorrectionPanel({ onSubmit, loading, error }: Props) {
           </div>
         )}
 
-        {/* Queue typeahead */}
+        {/* Queue typeahead — shown when "Specific Queue" is selected */}
         {targetType === "queue" && (
           <div className="relative">
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Target Queue</label>
@@ -181,7 +206,7 @@ export default function CorrectionPanel({ onSubmit, loading, error }: Props) {
           </div>
         )}
 
-        {/* Skills note */}
+        {/* Skills note — shown when "Skills-based" is selected */}
         {targetType === "skills" && (
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -198,7 +223,7 @@ export default function CorrectionPanel({ onSubmit, loading, error }: Props) {
           </div>
         )}
 
-        {/* Reason */}
+        {/* Reason field — shown for all target types once one is selected */}
         {targetType && (
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -211,6 +236,7 @@ export default function CorrectionPanel({ onSubmit, loading, error }: Props) {
               placeholder="e.g. The agent has the required skill, or this queue handles escalations"
               className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none placeholder-slate-400 dark:placeholder-slate-500"
             />
+            {/* Explicit privacy reminder on the reason field */}
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Do not include customer names or case details.</p>
           </div>
         )}

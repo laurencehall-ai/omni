@@ -1,5 +1,12 @@
-import { RoutingTrace, RoutingExplanation, RoutingFlag } from "./types";
+// ─── Deterministic routing analyzer ──────────────────────────────────────────
+// Produces a structured RoutingExplanation from a RoutingTrace without calling Claude.
+// This runs first — Claude narrates on top of it (if an API key is available).
+// The explanation is based entirely on the routing metadata: model, queue, agent,
+// skills, capacity, and timing. No customer data is touched here.
 
+import { RoutingTrace, RoutingFlag, RoutingChain, RoutingLeg } from "./types";
+
+// Formats a duration in seconds to a human-readable string for flag messages.
 function secondsToHuman(seconds: number): string {
   if (seconds < 60) return `${seconds} seconds`;
   const m = Math.floor(seconds / 60);
@@ -7,9 +14,19 @@ function secondsToHuman(seconds: number): string {
   return s > 0 ? `${m}m ${s}s` : `${m} minutes`;
 }
 
+// Maps Salesforce RoutingModel API values to human-readable labels.
 const ROUTING_MODEL_LABELS: Record<string, string> = {
   LeastActive: "Least Active",
   MostAvailable: "Most Available",
+};
+
+// Maps Salesforce RoutingType API values to human-readable labels.
+// RoutingType describes HOW the routing decision is made (the mechanism).
+// RoutingModel describes the agent-selection algorithm within that mechanism.
+const ROUTING_TYPE_LABELS: Record<string, string> = {
+  QueueBased:      "Queue-Based",
+  SkillsBased:     "Skills-Based",
+  OmniFlow:        "Omni-Channel Flow",
   ExternalRouting: "External Routing",
 };
 
@@ -17,106 +34,89 @@ function routingModelLabel(model: string): string {
   return ROUTING_MODEL_LABELS[model] ?? model;
 }
 
-export function analyzeRouting(trace: RoutingTrace): RoutingExplanation {
+function routingTypeLabel(type: string | null): string {
+  if (!type) return "Unknown";
+  return ROUTING_TYPE_LABELS[type] ?? type;
+}
+
+function isExternal(trace: RoutingTrace): boolean {
+  return trace.routingType === "ExternalRouting" || trace.routingModel === "ExternalRouting";
+}
+
+
+// ─── analyzeLeg ──────────────────────────────────────────────────────────────
+
+// Produces per-leg routing flags from the flat RoutingLeg shape.
+// Checks external routing, timing, capacity, and skill mismatches.
+export function analyzeLeg(leg: RoutingLeg, _chain: RoutingChain): RoutingFlag[] {
   const flags: RoutingFlag[] = [];
+  const n = leg.legIndex + 1;
+  const legLabel = leg.isAI ? `Leg ${n} (AI)` : `Leg ${n}`;
 
-  // --- Routing model explanation ---
-  const modelLabel = routingModelLabel(trace.routingModel);
-  let routingModelExplanation = "";
-
-  switch (trace.routingModel) {
-    case "LeastActive":
-      routingModelExplanation = `The queue uses the **Least Active** model, which assigns work to the agent with the fewest currently open items. ${trace.agentName} was selected because they had fewer active items than any other available agent in the queue at the time of routing.`;
-      break;
-    case "MostAvailable":
-      routingModelExplanation = `The queue uses the **Most Available** model, which assigns work to the agent with the most remaining capacity. ${trace.agentName} had the highest available capacity percentage (${trace.capacityPercentage ?? "unknown"}%) in the queue at the time of routing.`;
-      break;
-    case "ExternalRouting":
-      routingModelExplanation = `This work item was routed by an **External Routing** integration. Salesforce delegated the routing decision to an external system, which assigned it to ${trace.agentName}.`;
-      break;
-    default:
-      routingModelExplanation = `The routing model in use was **${modelLabel}**. ${trace.agentName} was selected by Omni-Channel based on this model's rules.`;
+  if (leg.routingType === "ExternalRouting" || leg.routingModel === "ExternalRouting") {
+    flags.push({
+      type: "warning",
+      message: `${legLabel}: This leg used External Routing. Salesforce did not control the routing decision — an external system determined the assignment.`,
+    });
   }
 
-  // --- Agent selection explanation ---
-  const agentSelectionExplanation = `The work item was assigned to **${trace.agentName}** (${trace.agentUsername}) in the **${trace.queueName}** queue via the **${trace.channelLabel}** channel.`;
-
-  // --- Skills explanation ---
-  let skillsExplanation: string | null = null;
-  if (trace.requiredSkills.length > 0) {
-    const requiredList = trace.requiredSkills
-      .map((s) => `${s.skillName}${s.skillLevel ? ` (level ${s.skillLevel})` : ""}`)
-      .join(", ");
-    const agentList =
-      trace.agentSkills.length > 0
-        ? trace.agentSkills
-            .map((s) => `${s.skillName}${s.skillLevel ? ` (level ${s.skillLevel})` : ""}`)
-            .join(", ")
-        : "none recorded";
-    skillsExplanation = `The routing config required the following skills: **${requiredList}**. ${trace.agentName}'s skills at time of routing: ${agentList}.`;
-
-    const requiredNames = new Set(trace.requiredSkills.map((s) => s.skillName));
-    const agentNames = new Set(trace.agentSkills.map((s) => s.skillName));
-    const missing = Array.from(requiredNames).filter((n) => !agentNames.has(n));
-    if (missing.length > 0) {
+  if (leg.timeToAcceptSeconds != null) {
+    if (leg.timeToAcceptSeconds > 300) {
       flags.push({
         type: "warning",
-        message: `Agent skill mismatch: required skills [${missing.join(", ")}] were not recorded on the assigned agent.`,
-      });
-    }
-  } else if (trace.routingModel === "ExternalRouting") {
-    skillsExplanation = null;
-  } else {
-    skillsExplanation = `No skill requirements were configured for this routing config. Any available agent in the queue was eligible.`;
-  }
-
-  // --- Capacity explanation ---
-  const capacityExplanation =
-    trace.capacityWeight != null
-      ? `This work item consumed **${trace.capacityWeight} capacity unit(s)**${trace.capacityPercentage != null ? ` (${trace.capacityPercentage}% of capacity)` : ""} when assigned.`
-      : "Capacity weight data was not available for this routing event.";
-
-  // --- Timing flags ---
-  if (trace.timeToAcceptSeconds != null) {
-    if (trace.timeToAcceptSeconds > 300) {
-      flags.push({
-        type: "warning",
-        message: `Long time to accept: ${secondsToHuman(trace.timeToAcceptSeconds)}. This may indicate the queue was understaffed or agent capacity weights are too high.`,
+        message: `${legLabel}: Long time to accept — ${secondsToHuman(leg.timeToAcceptSeconds)}. This may indicate the queue was understaffed or capacity weights are too high.`,
       });
     }
   } else {
     flags.push({
       type: "info",
-      message: "This work item has not been accepted yet, or accept time was not recorded.",
+      message: `${legLabel}: This leg has not been accepted yet, or accept time was not recorded.`,
     });
   }
 
-  // --- Capacity pressure flag ---
-  if (trace.capacityPercentage != null && trace.capacityPercentage >= 90) {
+  if (leg.capacityPercentage != null && leg.capacityPercentage >= 90) {
     flags.push({
       type: "warning",
-      message: `Agent was near full capacity (${trace.capacityPercentage}%) when assigned. Consider reviewing capacity weights or agent workload.`,
+      message: `${legLabel}: Agent was near full capacity (${leg.capacityPercentage}%) when assigned. Consider reviewing capacity weights or agent workload.`,
     });
   }
 
-  // --- Summary ---
-  const acceptedIn =
-    trace.timeToAcceptSeconds != null
-      ? ` ${trace.agentName} accepted in ${secondsToHuman(trace.timeToAcceptSeconds)}.`
-      : "";
+  if (leg.requiredSkills.length > 0) {
+    const requiredNames = new Set(leg.requiredSkills.map((s) => s.skillName));
+    const agentNames = new Set(leg.agentSkills.map((s) => s.skillName));
+    const missing = Array.from(requiredNames).filter((n) => !agentNames.has(n));
+    if (missing.length > 0) {
+      flags.push({
+        type: "warning",
+        message: `${legLabel}: Agent skill mismatch — required skills [${missing.join(", ")}] were not recorded on the assigned agent.`,
+      });
+    }
+  }
 
-  const summary =
-    `This ${trace.workItemType} came in through the **${trace.channelLabel}** channel ` +
-    `into the **${trace.queueName}** queue. ` +
-    `Using the **${modelLabel}** routing model, Omni-Channel assigned it to **${trace.agentName}**.` +
-    acceptedIn;
+  return flags;
+}
 
-  return {
-    summary,
-    routingModelExplanation,
-    agentSelectionExplanation,
-    skillsExplanation,
-    capacityExplanation,
-    flags,
-  };
+// ─── analyzeChain ─────────────────────────────────────────────────────────────
+
+// Runs analyzeLeg() on every leg (mutating leg.flags), then adds chain-level flags.
+// Returns the mutated chain.
+export function analyzeChain(chain: RoutingChain): RoutingChain {
+  for (const leg of chain.legs) {
+    leg.flags = analyzeLeg(leg, chain);
+  }
+
+  // Flag the first AI→human escalation detected in the chain.
+  if (chain.legs.length > 1) {
+    for (let i = 0; i < chain.legs.length - 1; i++) {
+      if (chain.legs[i].isAI && !chain.legs[i + 1].isAI) {
+        chain.chainFlags.push({
+          type: "info",
+          message: `AI-to-human escalation detected: Leg ${i + 1} (AI) handed off to Leg ${i + 2} (${chain.legs[i + 1].agentName}). Review bot containment rate and escalation triggers if this pattern is frequent.`,
+        });
+        break;
+      }
+    }
+  }
+
+  return chain;
 }

@@ -1,3 +1,15 @@
+// ─── GET /api/work-items ──────────────────────────────────────────────────────
+// Returns a paginated list of recent AgentWork records.
+//
+// Query parameters:
+//   days       — how many days back to look (default: 7)
+//   channelId  — filter to a specific service channel
+//   queueId    — filter to a specific queue
+//   agentId    — filter to a specific agent
+//
+// Returns an array of WorkItemRow objects enriched with customer info and queue names.
+// Returns 401 if no org is connected, 500 for any other error.
+
 import { NextRequest, NextResponse } from "next/server";
 import { getOrgOrThrow } from "@/lib/session";
 import { listWorkItems } from "@/lib/sf-queries";

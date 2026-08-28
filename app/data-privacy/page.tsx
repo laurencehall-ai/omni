@@ -4,122 +4,107 @@ export default function DataPrivacyPage() {
 
       <div className="mb-8">
         <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-1">Data &amp; Privacy</h1>
-        <p className="text-slate-500 dark:text-slate-400 text-sm">How RouteCause handles your Salesforce data</p>
+        <p className="text-slate-500 dark:text-slate-400 text-sm">How RouteCause handles your Salesforce data — honestly.</p>
       </div>
 
       {/* TL;DR callout */}
-      <div className="bg-white dark:bg-slate-900 border-2 border-brand-500 dark:border-brand-500 rounded-xl p-6 mb-8">
+      <div className="bg-white dark:bg-slate-900 border-2 border-brand-500 rounded-xl p-6 mb-8">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-1 h-4 bg-brand-500 rounded-full" />
           <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">The Short Version</p>
         </div>
-        <p className="text-lg font-bold text-slate-900 dark:text-white leading-snug">
-          Customer data never leaves your Salesforce org.
+        <p className="text-lg font-bold text-slate-900 dark:text-white leading-snug mb-2">
+          Customer data stays in your browser. It never reaches any AI or third party.
         </p>
-        <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mt-2">
-          Data is displayed in your browser session — the same as any Salesforce list view — but is never sent to any AI model or third-party service. Only routing infrastructure metadata and agent names are shared with the AI to generate explanations.
+        <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+          RouteCause displays customer identifiers (case numbers, masked phone numbers, contact names) in your browser session so you can find the right work item — the same way a Salesforce list view does. Before anything is sent to the AI, a strict filter removes all of it. The AI only ever sees routing plumbing: channels, queues, models, skills, and agent names.
         </p>
       </div>
 
       <div className="space-y-6">
 
-        {/* Section 1 */}
+        {/* What's displayed in your browser */}
         <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono mb-4">How the connection works</h2>
-          <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed mb-3">
-            RouteCause connects to your Salesforce org using OAuth 2.0 — the same standard your org uses for all connected apps. You authenticate directly with Salesforce; RouteCause never sees your Salesforce password.
-          </p>
-          <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-            Your access token is stored in an encrypted, server-side session cookie and used only to query the Salesforce REST API on your behalf. It is never logged or stored in a database.
-          </p>
-        </section>
-
-        {/* Section 2 */}
-        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono mb-4">What data is queried from Salesforce</h2>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-1 h-4 bg-brand-500 rounded-full" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">What's displayed in your browser</h2>
+          </div>
           <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed mb-4">
-            RouteCause queries only the <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">AgentWork</span> and <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">AgentWorkSkill</span> objects — Salesforce's internal routing event records. These contain routing infrastructure data, not customer content.
+            To help you find a specific work item, RouteCause queries the underlying Salesforce record and shows a limited identifier. This data is displayed in your authenticated browser session only — it travels from Salesforce to your browser, the same as any Salesforce list view or report.
           </p>
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {[
-              { label: "Routing metadata", examples: "Channel, queue, routing model, routing type, capacity weight, priority, status", safe: true },
-              { label: "Timing data", examples: "Work item created date, accept date/time, speed to answer", safe: true },
-              { label: "Agent information", examples: "Assigned agent name and username, skills matched", safe: true },
-              { label: "Work item reference ID", examples: "The Salesforce record ID of the underlying Case, Messaging Session, or Voice Call — used only to identify the type of item, never to fetch the record itself", safe: true },
-            ].map((row) => (
-              <div key={row.label} className="flex items-start gap-3 text-sm">
-                <span className="text-green-500 mt-0.5 shrink-0">✓</span>
+              { type: "Case", field: "CaseNumber + Contact Name", example: "Case 00012345 · Jane Smith" },
+              { type: "Voice Call", field: "From phone number (masked)", example: "Call from ***-***-1234" },
+              { type: "Messaging Session", field: "Messaging end user name/handle", example: "John Doe" },
+              { type: "All types", field: "Routing metadata + agent info", example: "Queue, model, skills, timing" },
+            ].map(row => (
+              <div key={row.type} className="flex items-start gap-3 text-sm">
+                <span className="text-brand-500 dark:text-brand-400 shrink-0 mt-0.5">→</span>
                 <div>
-                  <span className="font-medium text-slate-800 dark:text-slate-200">{row.label}</span>
-                  <span className="text-slate-500 dark:text-slate-400"> — {row.examples}</span>
+                  <span className="font-medium text-slate-800 dark:text-slate-200">{row.type}:</span>
+                  <span className="text-slate-600 dark:text-slate-400"> {row.field} </span>
+                  <span className="font-mono text-xs text-slate-400 dark:text-slate-500">e.g. {row.example}</span>
                 </div>
               </div>
             ))}
           </div>
-          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
-            {[
-              { label: "Case subject or description", note: "Not queried" },
-              { label: "Contact or customer name", note: "Not queried" },
-              { label: "Chat or messaging transcript", note: "Not queried" },
-              { label: "Phone number", note: "Not queried" },
-              { label: "Any custom object data", note: "Not queried" },
-            ].map((row) => (
-              <div key={row.label} className="flex items-start gap-3 text-sm">
-                <span className="text-slate-300 dark:text-slate-600 mt-0.5 shrink-0">✗</span>
-                <div>
-                  <span className="font-medium text-slate-800 dark:text-slate-200">{row.label}</span>
-                  <span className="text-slate-400 dark:text-slate-500"> — {row.note}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-4 leading-relaxed">
+            The admin using RouteCause must already have Salesforce access to these objects. RouteCause does not grant any additional data permissions beyond what their Salesforce profile allows.
+          </p>
         </section>
 
-        {/* Section 3 */}
+        {/* What the AI sees */}
         <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono mb-4">Two separate privacy boundaries</h2>
-
-          <div className="space-y-5">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 rounded-full bg-blue-500" />
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Boundary 1: Your browser (within your org)</p>
-              </div>
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed pl-4">
-                The work items list displays routing data in your browser session. This is equivalent to viewing a Salesforce list view or report — the data travels from Salesforce to your authenticated browser session and nowhere else. The admin using RouteCause sees the same data they would already have access to in Salesforce.
-              </p>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 rounded-full bg-amber-500" />
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Boundary 2: The AI model (strict — routing metadata only)</p>
-              </div>
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed pl-4 mb-3">
-                When RouteCause generates a routing explanation or configuration suggestion, it passes a filtered payload to an AI model (Claude by Anthropic). Before any data is sent, a data guard layer strips the payload to only routing infrastructure fields. Specifically:
-              </p>
-              <ul className="pl-4 space-y-1.5 text-sm text-slate-600 dark:text-slate-400">
-                <li className="flex items-start gap-2"><span className="text-green-500 shrink-0">✓</span> Sent to AI: channel name, queue name, routing model, skills, capacity weight, agent name, timing</li>
-                <li className="flex items-start gap-2"><span className="text-red-400 shrink-0">✗</span> Never sent to AI: work item ID, any customer-facing record data</li>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-1 h-4 bg-amber-500 rounded-full" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">What the AI sees</h2>
+          </div>
+          <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed mb-4">
+            When generating a routing explanation or configuration suggestion, RouteCause sends a filtered payload to Claude (by Anthropic). A data guard layer strips the payload before it leaves the app server. The AI cannot identify or reference any customer from the data it receives.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+              <p className="text-xs font-bold text-green-700 dark:text-green-400 uppercase tracking-wide mb-2">Sent to AI</p>
+              <ul className="space-y-1 text-xs text-green-700 dark:text-green-400">
+                <li>✓ Channel name</li>
+                <li>✓ Queue name</li>
+                <li>✓ Routing model &amp; type</li>
+                <li>✓ Skills matched</li>
+                <li>✓ Capacity weight</li>
+                <li>✓ Agent name</li>
+                <li>✓ Time to accept</li>
               </ul>
-              <p className="text-sm text-slate-500 dark:text-slate-500 leading-relaxed pl-4 mt-3">
-                The AI cannot identify or reference any customer from the data it receives. It sees only the routing plumbing — the same information a Salesforce admin would look at in the Omni-Channel Supervisor tab.
-              </p>
+            </div>
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+              <p className="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-wide mb-2">Never sent to AI</p>
+              <ul className="space-y-1 text-xs text-red-700 dark:text-red-400">
+                <li>✗ Customer name</li>
+                <li>✗ Phone number</li>
+                <li>✗ Case subject or description</li>
+                <li>✗ Chat or message content</li>
+                <li>✗ Work item ID</li>
+                <li>✗ Any contact or account data</li>
+              </ul>
             </div>
           </div>
         </section>
 
-        {/* Section 4 */}
+        {/* What RouteCause doesn't do */}
         <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono mb-4">What RouteCause does not do</h2>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-1 h-4 bg-slate-400 rounded-full" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">What RouteCause does not do</h2>
+          </div>
           <ul className="space-y-2.5">
             {[
               "Store any Salesforce data in a database or log file",
-              "Share data with any third party other than the AI model (and only routing metadata to that)",
-              "Retain routing data between sessions",
+              "Retain data between sessions — closing the browser clears everything",
+              "Share data with any third party other than the AI model (routing metadata only)",
               "Train or fine-tune any AI model on your data",
-              "Access any Salesforce object beyond AgentWork and AgentWorkSkill",
-            ].map((item) => (
+              "Access any Salesforce object beyond what's described above",
+              "Push any changes back to your Salesforce org",
+            ].map(item => (
               <li key={item} className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-300">
                 <span className="text-slate-300 dark:text-slate-600 shrink-0 mt-0.5">—</span>
                 {item}
@@ -128,30 +113,34 @@ export default function DataPrivacyPage() {
           </ul>
         </section>
 
-        {/* Section 5 */}
+        {/* Connection & auth */}
         <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono mb-4">Who should use this tool</h2>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-1 h-4 bg-brand-500 rounded-full" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">Connection &amp; authentication</h2>
+          </div>
           <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-            RouteCause is intended for Salesforce administrators and routing configuration owners. It is not a customer-facing tool. The person running RouteCause should already have Salesforce admin or service cloud user access — the tool does not grant any additional data permissions beyond what their Salesforce profile already allows.
+            RouteCause connects via Salesforce OAuth 2.0. You authenticate directly with Salesforce — RouteCause never sees your password. Your access token is stored in an encrypted, server-side session cookie for the duration of your session and is never logged or persisted to a database.
           </p>
         </section>
 
-        {/* Section 6 */}
+        {/* AI provider */}
         <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono mb-4">AI model provider</h2>
-          <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed mb-3">
-            Routing explanations and configuration suggestions are generated by <strong className="text-slate-900 dark:text-white">Claude</strong>, made by Anthropic. Only the filtered routing metadata payload described above is sent. Anthropic's data usage policies apply to that payload.
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-1 h-4 bg-brand-500 rounded-full" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">AI model provider</h2>
+          </div>
+          <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed mb-2">
+            Routing explanations and configuration suggestions are generated by <strong className="text-slate-900 dark:text-white">Claude</strong> by Anthropic. Only the filtered routing metadata payload described above is transmitted. Anthropic's data usage policies apply to that payload.
           </p>
           <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-            If no AI API key is configured, RouteCause falls back to a fully deterministic, local explanation engine — no data leaves the app server at all.
+            If no AI API key is configured, RouteCause falls back to a fully local, deterministic explanation engine — no data leaves the app server at all.
           </p>
         </section>
 
       </div>
 
-      <p className="text-xs text-slate-400 dark:text-slate-600 text-center mt-8 font-mono">
-        RouteCause v1 · Built for Salesforce admins
-      </p>
+
     </div>
   );
 }
