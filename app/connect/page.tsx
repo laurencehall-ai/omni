@@ -47,32 +47,32 @@ function ConnectForm() {
 
   return (
     <div className="max-w-lg mx-auto mt-12">
-      <h1 className="text-2xl font-bold text-slate-900 mb-2">Connect Your Salesforce Org</h1>
-      <p className="text-slate-500 mb-8 text-sm">
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Connect Your Salesforce Org</h1>
+      <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm">
         RouteCause connects to your org via a Salesforce Connected App. Your credentials are stored only in your session and never persisted to disk.
       </p>
 
       {/* Setup checklist */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <p className="text-sm font-semibold text-blue-800 mb-2">Before connecting, create a Connected App in your org:</p>
-        <ol className="text-sm text-blue-700 list-decimal list-inside space-y-1">
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+        <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">Before connecting, create a Connected App in your org:</p>
+        <ol className="text-sm text-blue-700 dark:text-blue-400 list-decimal list-inside space-y-1">
           <li>Go to <strong>Setup → App Manager → New Connected App</strong></li>
           <li>Enable <strong>OAuth Settings</strong></li>
-          <li>Set callback URL to: <code className="bg-blue-100 px-1 rounded">{process.env.NEXT_PUBLIC_CALLBACK_URL ?? "http://localhost:3000/api/auth/callback"}</code></li>
+          <li>Set callback URL to: <code className="bg-blue-100 dark:bg-blue-900/40 px-1 rounded">{process.env.NEXT_PUBLIC_CALLBACK_URL ?? "http://localhost:3000/api/auth/callback"}</code></li>
           <li>Add OAuth scopes: <strong>api</strong>, <strong>refresh_token</strong>, <strong>offline_access</strong></li>
           <li>Save and copy the <strong>Consumer Key</strong> (Client ID) and <strong>Consumer Secret</strong></li>
         </ol>
       </div>
 
       {(errorMessage ?? formError) && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm text-red-700">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-4 text-sm text-red-700 dark:text-red-400">
           {errorMessage ?? formError}
         </div>
       )}
 
       <form onSubmit={handleConnect} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
             Instance URL
           </label>
           <input
@@ -81,11 +81,11 @@ function ConnectForm() {
             value={instanceUrl}
             onChange={(e) => setInstanceUrl(e.target.value)}
             required
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
             Client ID (Consumer Key)
           </label>
           <input
@@ -93,11 +93,11 @@ function ConnectForm() {
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
             required
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
             Client Secret (Consumer Secret)
           </label>
           <input
@@ -105,7 +105,7 @@ function ConnectForm() {
             value={clientSecret}
             onChange={(e) => setClientSecret(e.target.value)}
             required
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
         <button
