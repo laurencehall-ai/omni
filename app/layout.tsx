@@ -73,10 +73,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="px-6 py-4 flex items-center justify-between">
             <p className="text-xs text-slate-400 dark:text-slate-600 font-mono">RouteCause v1</p>
             <div className="flex items-center gap-4">
-              <a href="/about" className="text-xs text-slate-400 dark:text-slate-600 hover:text-brand-500 dark:hover:text-brand-400 font-mono underline-offset-2 hover:underline">About</a>
-              <a href="/omni-channel" className="text-xs text-slate-400 dark:text-slate-600 hover:text-brand-500 dark:hover:text-brand-400 font-mono underline-offset-2 hover:underline">Omni‑Channel</a>
-              <a href="/made-with" className="text-xs text-slate-400 dark:text-slate-600 hover:text-brand-500 dark:hover:text-brand-400 font-mono underline-offset-2 hover:underline">Made With SF + Claude</a>
+              <a href="/about" className="text-xs text-slate-400 dark:text-slate-600 hover:text-brand-500 dark:hover:text-brand-400 font-mono underline-offset-2 hover:underline">Get Started</a>
               <a href="/data-privacy" className="text-xs text-slate-400 dark:text-slate-600 hover:text-brand-500 dark:hover:text-brand-400 font-mono underline-offset-2 hover:underline">Data &amp; Privacy</a>
+              <a href="/omni-channel" className="text-xs text-slate-400 dark:text-slate-600 hover:text-brand-500 dark:hover:text-brand-400 font-mono underline-offset-2 hover:underline">Omni‑Channel</a>
             </div>
           </div>
         </footer>

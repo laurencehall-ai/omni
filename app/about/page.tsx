@@ -3,9 +3,10 @@ export default function AboutPage() {
     <div className="max-w-3xl mx-auto py-4 space-y-10">
 
       <div>
-        <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-1">About RouteCause</h1>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-1">Get Started</h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm">
-          Everything you need to know about what it does, how to connect it, and how to use it.
+          Everything you need to know about what RouteCause does, how to connect your org, and how to use it.
+          For details on how your data is handled, see the <a href="/data-privacy" className="text-brand-500 dark:text-brand-400 hover:underline">Data &amp; Privacy</a> page.
         </p>
       </div>
 

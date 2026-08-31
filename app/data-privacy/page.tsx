@@ -35,7 +35,7 @@ export default function DataPrivacyPage() {
           <div className="space-y-2.5">
             {[
               { type: "Case", field: "CaseNumber + Contact Name", example: "Case 00012345 · Jane Smith" },
-              { type: "Voice Call", field: "From phone number (masked)", example: "Call from ***-***-1234" },
+              { type: "Voice Call", field: "From phone number (full)", example: "Call from +14155551234" },
               { type: "Messaging Session", field: "Messaging end user name/handle", example: "John Doe" },
               { type: "All types", field: "Routing metadata + agent info", example: "Queue, model, skills, timing" },
             ].map(row => (
