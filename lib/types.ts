@@ -14,7 +14,7 @@ export interface OrgConnection {
 // Displayed in the browser only — never sent to Claude or any external API.
 // The workItemId is the Salesforce record ID of the underlying object (Case, VoiceCall, etc.)
 export interface CustomerInfo {
-  workItemId: string;     // Used as fallback link to view the record in Salesforce
+  workItemId: string; // Used as fallback link to view the record in Salesforce
   caseNumber: string | null;
   caseId: string | null;
   contactName: string | null;
@@ -25,18 +25,18 @@ export interface CustomerInfo {
 // A single row in the work items list page.
 // Built from AgentWork + customer enrichment + queue name resolution.
 export interface WorkItemRow {
-  id: string;                         // AgentWork record ID
-  workItemType: string;               // Inferred from WorkItemId prefix (Case, Voice Call, etc.)
-  workItemRef: string;                // Last 6 chars of WorkItemId, shown as a short reference
-  customerLabel: string | null;       // Human-readable summary label for display
-  customer: CustomerInfo | null;      // Full customer info for the data table
-  channelLabel: string;               // Service channel name (e.g. "Cases", "Phone")
-  queueName: string;                  // Queue the work item waited in
-  agentName: string;                  // Agent it was assigned to
-  routingModel: string;               // LeastActive, MostAvailable, ExternalRouting, etc.
-  routingType: string;                // QueueBased, SkillsBased, OmniFlow, ExternalRouting
-  status: string;                     // Opened, Assigned, Declined, etc.
-  createdDate: string;                // ISO timestamp
+  id: string; // AgentWork record ID
+  workItemType: string; // Inferred from WorkItemId prefix (Case, Voice Call, etc.)
+  workItemRef: string; // Last 6 chars of WorkItemId, shown as a short reference
+  customerLabel: string | null; // Human-readable summary label for display
+  customer: CustomerInfo | null; // Full customer info for the data table
+  channelLabel: string; // Service channel name (e.g. "Cases", "Phone")
+  queueName: string; // Queue the work item waited in
+  agentName: string; // Agent it was assigned to
+  routingModel: string; // LeastActive, MostAvailable, ExternalRouting, etc.
+  routingType: string; // QueueBased, SkillsBased, OmniFlow, ExternalRouting
+  status: string; // Opened, Assigned, Declined, etc.
+  createdDate: string; // ISO timestamp
   acceptDateTime: string | null;
   timeToAcceptSeconds: number | null;
 }
@@ -44,26 +44,26 @@ export interface WorkItemRow {
 // Full routing trace for a single AgentWork record.
 // This is the core data object used on the trace page.
 export interface RoutingTrace {
-  workItemId: string;     // AgentWork record ID — used for API calls (suggest, etc.)
-  sfWorkItemId: string;  // The underlying SF record (Case, VoiceCall, MessagingSession, etc.)
+  workItemId: string; // AgentWork record ID — used for API calls (suggest, etc.)
+  sfWorkItemId: string; // The underlying SF record (Case, VoiceCall, MessagingSession, etc.)
   workItemType: string;
   customer: CustomerInfo | null;
-  instanceUrl: string;               // Used to build clickable Salesforce record links
+  instanceUrl: string; // Used to build clickable Salesforce record links
   channelLabel: string;
   queueName: string;
   agentName: string;
   agentUsername: string;
   routingModel: string;
-  routingType: string | null;  // QueueBased, SkillsBased, OmniFlow, ExternalRouting
+  routingType: string | null; // QueueBased, SkillsBased, OmniFlow, ExternalRouting
   capacityWeight: number | null;
   capacityPercentage: number | null;
   createdDate: string;
   acceptDateTime: string | null;
   timeToAcceptSeconds: number | null;
-  routingConfigName: string | null;  // null — RoutingConfig not queryable via REST in most orgs
+  routingConfigName: string | null; // null — RoutingConfig not queryable via REST in most orgs
   routingConfigPriority: number | null;
   requiredSkills: SkillRequirement[]; // Skills the routing config required
-  agentSkills: AgentSkill[];          // Skills the assigned agent had at time of routing
+  agentSkills: AgentSkill[]; // Skills the assigned agent had at time of routing
   status: string;
 }
 
@@ -87,7 +87,7 @@ export interface RoutingExplanation {
   agentSelectionExplanation: string;
   skillsExplanation: string | null;
   capacityExplanation: string;
-  flags: RoutingFlag[];               // Warnings and info messages surfaced in the UI
+  flags: RoutingFlag[]; // Warnings and info messages surfaced in the UI
 }
 
 // A flag attached to a routing explanation — warnings shown as amber banners.
@@ -103,23 +103,23 @@ export interface CorrectionInput {
   targetAgentName?: string;
   targetQueueId?: string;
   targetQueueName?: string;
-  reason?: string;                    // Optional free-text rationale from the admin
+  reason?: string; // Optional free-text rationale from the admin
 }
 
 // Output from suggestConfiguration — displayed by SuggestionPanel.
 export interface ConfigSuggestion {
   likelyCause: string;
   suggestedChanges: SuggestedChange[];
-  flowNote: string | null;            // Present if an Omni-Channel Flow may be involved
+  flowNote: string | null; // Present if an Omni-Channel Flow may be involved
   confidence: "High" | "Medium" | "Low";
 }
 
 // A single recommended configuration change within a ConfigSuggestion.
 export interface SuggestedChange {
-  area: string;           // Salesforce setting area (e.g. "Queue Membership", "Skill Requirements")
-  currentValue: string;   // What it is now
+  area: string; // Salesforce setting area (e.g. "Queue Membership", "Skill Requirements")
+  currentValue: string; // What it is now
   suggestedValue: string; // What it should be
-  rationale: string;      // Why this change would fix the misrouting
+  rationale: string; // Why this change would fix the misrouting
 }
 
 // Used by the agent typeahead in CorrectionPanel.

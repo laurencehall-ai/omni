@@ -211,11 +211,15 @@ export default function MadeWithPage() {
 
   return (
     <div className="max-w-4xl mx-auto py-4 space-y-10">
-
       <div>
-        <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-1">Made with Salesforce + Claude</h1>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-1">
+          Made with Salesforce + Claude
+        </h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed max-w-2xl">
-          RouteCause was built collaboratively — someone who knew exactly what the problem was, working with Claude to design and build it. The requirements, decisions, and constraints came from real experience with Salesforce Omni-Channel; the code came from the conversation.
+          RouteCause was built collaboratively — someone who knew exactly what
+          the problem was, working with Claude to design and build it. The
+          requirements, decisions, and constraints came from real experience
+          with Salesforce Omni-Channel; the code came from the conversation.
         </p>
       </div>
 
@@ -223,16 +227,31 @@ export default function MadeWithPage() {
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6 space-y-3">
         <div className="flex items-center gap-2 mb-2">
           <div className="w-1 h-4 bg-brand-500 rounded-full" />
-          <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">How it was built</h2>
+          <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">
+            How it was built
+          </h2>
         </div>
         <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-          This app didn't start with a spec doc. It started with a problem: <em>why did this work item route to that agent?</em> Salesforce doesn't have a native tool to answer that question in plain English, so we built one.
+          This app didn't start with a spec doc. It started with a problem:{" "}
+          <em>why did this work item route to that agent?</em> Salesforce
+          doesn't have a native tool to answer that question in plain English,
+          so we built one.
         </p>
         <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-          The architecture, data model, privacy constraints, and UX decisions all came from hands-on Salesforce experience. Claude translated those into working Next.js code, caught API limitations (like which objects aren't queryable via REST), and iterated on the design through conversation — no Figma file, no PRD, just back-and-forth.
+          The architecture, data model, privacy constraints, and UX decisions
+          all came from hands-on Salesforce experience. Claude translated those
+          into working Next.js code, caught API limitations (like which objects
+          aren't queryable via REST), and iterated on the design through
+          conversation — no Figma file, no PRD, just back-and-forth.
         </p>
         <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-          The hard rule — <strong className="text-slate-900 dark:text-white">customer data never leaves the org or reaches any AI</strong> — was set on day one and enforced in every subsequent decision. That constraint shaped the data-guard layer, the privacy page, and which fields are included in every API payload.
+          The hard rule —{" "}
+          <strong className="text-slate-900 dark:text-white">
+            customer data never leaves the org or reaches any AI
+          </strong>{" "}
+          — was set on day one and enforced in every subsequent decision. That
+          constraint shaped the data-guard layer, the privacy page, and which
+          fields are included in every API payload.
         </p>
       </section>
 
@@ -240,15 +259,25 @@ export default function MadeWithPage() {
       <section className="space-y-6">
         <div className="flex items-center gap-2">
           <div className="w-1 h-4 bg-brand-500 rounded-full" />
-          <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">Full Requirements</h2>
+          <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">
+            Full Requirements
+          </h2>
         </div>
 
         {REQUIREMENTS.map(({ category, items }) => (
-          <div key={category} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-3">{category}</h3>
+          <div
+            key={category}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6"
+          >
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-3">
+              {category}
+            </h3>
             <ul className="space-y-1.5">
               {items.map((item, i) => (
-                <li key={i} className="flex gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <li
+                  key={i}
+                  className="flex gap-2 text-sm text-slate-600 dark:text-slate-400"
+                >
                   <span className="text-brand-400 shrink-0 mt-0.5">–</span>
                   <span>{item}</span>
                 </li>
@@ -262,26 +291,31 @@ export default function MadeWithPage() {
       <section className="space-y-4">
         <div className="flex items-center gap-2">
           <div className="w-1 h-4 bg-amber-500 rounded-full" />
-          <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">One-Pass Build Prompt</h2>
+          <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">
+            One-Pass Build Prompt
+          </h2>
         </div>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          If you wanted to recreate this app from scratch in a single prompt to Claude, this is how you would describe it.
+          If you wanted to recreate this app from scratch in a single prompt to
+          Claude, this is how you would describe it.
         </p>
         <div className="relative bg-slate-900 dark:bg-slate-950 border border-slate-700 rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 border-b border-slate-700">
             <span className="text-xs text-slate-500 font-mono">prompt</span>
-            <button onClick={copyPrompt}
-              className="text-xs font-mono px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition-colors">
+            <button
+              onClick={copyPrompt}
+              className="text-xs font-mono px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition-colors"
+            >
               {copied ? "✓ Copied" : "Copy"}
             </button>
           </div>
           <div className="p-5 overflow-x-auto">
-            <pre className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap font-mono">{ONE_PASS_PROMPT}</pre>
+            <pre className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap font-mono">
+              {ONE_PASS_PROMPT}
+            </pre>
           </div>
         </div>
       </section>
-
-
     </div>
   );
 }

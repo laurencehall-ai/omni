@@ -17,7 +17,9 @@ export async function GET(req: NextRequest) {
 
   // Salesforce sends error= if the admin denies access or if something is misconfigured
   if (error) {
-    return NextResponse.redirect(new URL(`/connect?error=${encodeURIComponent(error)}`, req.url));
+    return NextResponse.redirect(
+      new URL(`/connect?error=${encodeURIComponent(error)}`, req.url),
+    );
   }
   if (!code) {
     return NextResponse.redirect(new URL("/connect?error=no_code", req.url));
@@ -29,7 +31,9 @@ export async function GET(req: NextRequest) {
 
   if (!pending) {
     // Session expired or cookie was lost between the two requests
-    return NextResponse.redirect(new URL("/connect?error=session_expired", req.url));
+    return NextResponse.redirect(
+      new URL("/connect?error=session_expired", req.url),
+    );
   }
 
   // Exchange the authorization code for tokens.
@@ -52,7 +56,9 @@ export async function GET(req: NextRequest) {
   if (!tokenRes.ok) {
     const body = await tokenRes.text();
 
-    return NextResponse.redirect(new URL("/connect?error=token_exchange_failed", req.url));
+    return NextResponse.redirect(
+      new URL("/connect?error=token_exchange_failed", req.url),
+    );
   }
 
   const tokenData = await tokenRes.json();

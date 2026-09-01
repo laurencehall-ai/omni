@@ -18,7 +18,8 @@ export function useTheme(): boolean {
 
   useEffect(() => {
     // Read the current state on mount
-    const check = () => setIsDark(document.documentElement.classList.contains("dark"));
+    const check = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
     check();
 
     // Watch for any future changes to the class attribute on <html>

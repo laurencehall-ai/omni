@@ -9,12 +9,20 @@
 // If no API key is configured, all functions return deterministic
 // fallback responses so the app works without a Claude subscription.
 
-import { RoutingTrace, RoutingExplanation, CorrectionInput, ConfigSuggestion, RoutingChain } from "./types";
+import {
+  RoutingTrace,
+  RoutingExplanation,
+  CorrectionInput,
+  ConfigSuggestion,
+  RoutingChain,
+} from "./types";
 import { SynopsisData } from "./sf-synopsis";
 
 // Check once at startup whether a real API key is present.
 // "your_anthropic_api_key" is the placeholder in .env.local.example — treat it as absent.
-const hasApiKey = !!process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== "your_anthropic_api_key";
+const hasApiKey =
+  !!process.env.ANTHROPIC_API_KEY &&
+  process.env.ANTHROPIC_API_KEY !== "your_anthropic_api_key";
 
 // ─── Internal helper ──────────────────────────────────────────────────────────
 
@@ -36,7 +44,10 @@ async function callClaude(prompt: string, maxTokens: number): Promise<string> {
 
 // Used when no API key is available — assembles the explanation sections
 // from the already-computed RoutingExplanation into a plain-text narration.
-function buildDeterministicNarration(trace: RoutingTrace, explanation: RoutingExplanation): string {
+function buildDeterministicNarration(
+  trace: RoutingTrace,
+  explanation: RoutingExplanation,
+): string {
   const parts: string[] = [explanation.summary];
   parts.push(explanation.routingModelExplanation);
   if (explanation.skillsExplanation) parts.push(explanation.skillsExplanation);
@@ -51,7 +62,7 @@ function buildDeterministicNarration(trace: RoutingTrace, explanation: RoutingEx
 // Falls back to the deterministic narration if Claude is unavailable.
 export async function narrateRouting(
   trace: RoutingTrace,
-  explanation: RoutingExplanation
+  explanation: RoutingExplanation,
 ): Promise<string> {
   if (!hasApiKey) {
     return buildDeterministicNarration(trace, explanation);
@@ -117,18 +128,40 @@ Be factual and concise. Do not speculate beyond the data.`;
 // Deterministic synopsis fallback — used when no API key is configured.
 function buildDeterministicSynopsis(synopsis: SynopsisData): string {
   const parts: string[] = [];
-  parts.push(`This org has ${synopsis.channels.length} service channel(s) configured: ${synopsis.channels.map(c => c.label).join(", ") || "none"}.`);
-  const queueCount = synopsis.queues !== null ? `${synopsis.queues.length}` : "an unknown number of";
-  const configCount = synopsis.routingConfigs !== null ? `${synopsis.routingConfigs.length}` : "an unknown number of";
-  parts.push(`There are ${queueCount} Omni-Channel queue(s) and ${configCount} routing configuration(s). Each queue is linked to a routing config that controls agent selection.`);
+  parts.push(
+    `This org has ${synopsis.channels.length} service channel(s) configured: ${synopsis.channels.map((c) => c.label).join(", ") || "none"}.`,
+  );
+  const queueCount =
+    synopsis.queues !== null
+      ? `${synopsis.queues.length}`
+      : "an unknown number of";
+  const configCount =
+    synopsis.routingConfigs !== null
+      ? `${synopsis.routingConfigs.length}`
+      : "an unknown number of";
+  parts.push(
+    `There are ${queueCount} Omni-Channel queue(s) and ${configCount} routing configuration(s). Each queue is linked to a routing config that controls agent selection.`,
+  );
   if (synopsis.skills.length > 0) {
-    parts.push(`Skills-based routing is in use with ${synopsis.skills.length} skill(s) defined: ${synopsis.skills.map(s => s.name).slice(0, 5).join(", ")}${synopsis.skills.length > 5 ? "…" : ""}.`);
+    parts.push(
+      `Skills-based routing is in use with ${synopsis.skills.length} skill(s) defined: ${synopsis.skills
+        .map((s) => s.name)
+        .slice(0, 5)
+        .join(", ")}${synopsis.skills.length > 5 ? "…" : ""}.`,
+    );
   } else {
     parts.push("No skills are configured — routing is queue-based only.");
   }
-  const presenceCount = synopsis.presenceConfigs !== null ? synopsis.presenceConfigs.length : "an unknown number of";
-  parts.push(`${presenceCount} presence configuration(s) control agent availability.`);
-  parts.push(`There are ${synopsis.agentCount} active standard users in this org. Not all may be Omni-Channel agents.`);
+  const presenceCount =
+    synopsis.presenceConfigs !== null
+      ? synopsis.presenceConfigs.length
+      : "an unknown number of";
+  parts.push(
+    `${presenceCount} presence configuration(s) control agent availability.`,
+  );
+  parts.push(
+    `There are ${synopsis.agentCount} active standard users in this org. Not all may be Omni-Channel agents.`,
+  );
   return parts.join("\n\n");
 }
 
@@ -139,7 +172,7 @@ function buildDeterministicSynopsis(synopsis: SynopsisData): string {
 // Falls back to a deterministic rule-based suggestion when no API key is available.
 export async function suggestConfiguration(
   trace: RoutingTrace,
-  correction: CorrectionInput
+  correction: CorrectionInput,
 ): Promise<ConfigSuggestion> {
   if (!hasApiKey) {
     return buildDeterministicSuggestion(trace, correction);
@@ -164,7 +197,10 @@ Keep each string value short (under 100 characters). Use at most 3 suggestedChan
   try {
     const text = await callClaude(prompt, 800);
     // Strip any markdown code fences Claude may have added despite instructions
-    const stripped = text.replace(/```(?:json)?\s*/g, "").replace(/```/g, "").trim();
+    const stripped = text
+      .replace(/```(?:json)?\s*/g, "")
+      .replace(/```/g, "")
+      .trim();
     const jsonMatch = stripped.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("no JSON found");
     // Remove trailing commas to handle slightly malformed JSON from the model
@@ -180,14 +216,15 @@ Keep each string value short (under 100 characters). Use at most 3 suggestedChan
 // based on routing model, queue membership, and skill gaps.
 function buildDeterministicSuggestion(
   trace: RoutingTrace,
-  correction: CorrectionInput
+  correction: CorrectionInput,
 ): ConfigSuggestion {
   const suggestedChanges = [];
 
   const wantedDifferentQueue =
     correction.targetQueueId && correction.targetQueueId !== trace.queueName;
   const wantedDifferentAgent =
-    correction.targetAgentName && correction.targetAgentName !== trace.agentName;
+    correction.targetAgentName &&
+    correction.targetAgentName !== trace.agentName;
 
   if (wantedDifferentQueue) {
     suggestedChanges.push({
@@ -245,14 +282,13 @@ function buildDeterministicSuggestion(
     });
   }
 
-  const likelyCause =
-    correction.reason
-      ? `Based on your input: "${correction.reason}". `
-      : "" +
-        `The work item was routed to ${trace.agentName} via the ${trace.routingModel} model in the ${trace.queueName} queue. ` +
-        (wantedDifferentAgent
-          ? `The intended agent (${correction.targetAgentName}) was likely unavailable, at capacity, or lacked required skills at the time of routing.`
-          : "The routing config may need adjustment to reach the intended queue.");
+  const likelyCause = correction.reason
+    ? `Based on your input: "${correction.reason}". `
+    : "" +
+      `The work item was routed to ${trace.agentName} via the ${trace.routingModel} model in the ${trace.queueName} queue. ` +
+      (wantedDifferentAgent
+        ? `The intended agent (${correction.targetAgentName}) was likely unavailable, at capacity, or lacked required skills at the time of routing.`
+        : "The routing config may need adjustment to reach the intended queue.");
 
   return {
     likelyCause,
@@ -342,13 +378,15 @@ Write 2-4 short paragraphs. Be factual — only state what the data shows.`;
 
 // Deterministic chain narrative — used when no API key is configured or Claude fails.
 // Produces a readable summary directly from the safe payload fields.
-function buildDeterministicChainNarrative(safePayload: ChainSafePayload): string {
+function buildDeterministicChainNarrative(
+  safePayload: ChainSafePayload,
+): string {
   const { workItemType, legs, chainFlags } = safePayload;
   const legCount = legs.length;
 
   const parts: string[] = [];
   parts.push(
-    `This ${workItemType} had ${legCount} routing leg${legCount === 1 ? "" : "s"}.`
+    `This ${workItemType} had ${legCount} routing leg${legCount === 1 ? "" : "s"}.`,
   );
 
   legs.forEach((leg, index) => {
@@ -366,7 +404,9 @@ function buildDeterministicChainNarrative(safePayload: ChainSafePayload): string
 
     // Surface any per-leg flags
     if (leg.flags && leg.flags.length > 0) {
-      const flagMessages = leg.flags.map((f: { message: string }) => f.message).join(" ");
+      const flagMessages = leg.flags
+        .map((f: { message: string }) => f.message)
+        .join(" ");
       legText += ` Note: ${flagMessages}`;
     }
 
@@ -376,8 +416,8 @@ function buildDeterministicChainNarrative(safePayload: ChainSafePayload): string
       const escalationTarget = nextLeg.agentName
         ? nextLeg.agentName
         : nextLeg.queueName
-        ? nextLeg.queueName
-        : "the next leg";
+          ? nextLeg.queueName
+          : "the next leg";
       legText += ` Escalated to Leg ${legNum + 1}: ${escalationTarget}.`;
     }
 

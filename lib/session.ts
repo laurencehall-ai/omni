@@ -18,8 +18,8 @@ export interface SessionData {
   _pending?: {
     instanceUrl: string;
     clientId: string;
-    clientSecret: string;   // Stored for potential future use (e.g. token refresh)
-    codeVerifier: string;   // PKCE code verifier — sent to Salesforce at token exchange
+    clientSecret: string; // Stored for potential future use (e.g. token refresh)
+    codeVerifier: string; // PKCE code verifier — sent to Salesforce at token exchange
   };
 }
 
@@ -28,7 +28,7 @@ export const sessionOptions = {
   cookieName: "routecause_session",
   cookieOptions: {
     secure: process.env.NODE_ENV === "production", // HTTPS only in prod, HTTP OK in dev
-    httpOnly: true,                                 // Never exposed to browser JavaScript
+    httpOnly: true, // Never exposed to browser JavaScript
   },
 };
 

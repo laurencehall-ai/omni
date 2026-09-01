@@ -31,15 +31,18 @@ const config: Config = {
   },
   safelist: [
     {
-      pattern: /bg-(slate|violet|emerald|amber|pink|green|red|blue|brand)-(50|100|200|300|400|500|600|700|800|900)(\/\d+)?/,
+      pattern:
+        /bg-(slate|violet|emerald|amber|pink|green|red|blue|brand)-(50|100|200|300|400|500|600|700|800|900)(\/\d+)?/,
       variants: ["dark", "hover", "dark:hover"],
     },
     {
-      pattern: /text-(slate|violet|emerald|amber|pink|green|red|blue|brand|white)-(50|100|200|300|400|500|600|700|800|900)/,
+      pattern:
+        /text-(slate|violet|emerald|amber|pink|green|red|blue|brand|white)-(50|100|200|300|400|500|600|700|800|900)/,
       variants: ["dark"],
     },
     {
-      pattern: /border-(slate|violet|emerald|amber|pink|green|red|blue)-(100|200|300|400|500|600|700|800)/,
+      pattern:
+        /border-(slate|violet|emerald|amber|pink|green|red|blue)-(100|200|300|400|500|600|700|800)/,
       variants: ["dark"],
     },
   ],

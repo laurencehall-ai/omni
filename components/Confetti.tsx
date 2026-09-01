@@ -9,17 +9,28 @@ import { useEffect, useRef } from "react";
 
 // Each particle's mutable physics state — updated every animation frame
 interface Particle {
-  x: number; y: number;
-  vx: number; vy: number;     // Velocity in x and y directions
+  x: number;
+  y: number;
+  vx: number;
+  vy: number; // Velocity in x and y directions
   color: string;
   size: number;
   rotation: number;
   rotationSpeed: number;
   shape: "rect" | "circle";
-  alpha: number;              // Opacity, fades to 0 after ~90 frames
+  alpha: number; // Opacity, fades to 0 after ~90 frames
 }
 
-const COLORS = ["#0070d2","#00b4d8","#f72585","#4cc9f0","#7209b7","#ffd60a","#06d6a0","#ff6b35"];
+const COLORS = [
+  "#0070d2",
+  "#00b4d8",
+  "#f72585",
+  "#4cc9f0",
+  "#7209b7",
+  "#ffd60a",
+  "#06d6a0",
+  "#ff6b35",
+];
 
 export default function Confetti({ onDone }: { onDone: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -60,7 +71,7 @@ export default function Confetti({ onDone }: { onDone: () => void }) {
       for (const p of particles) {
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.07;        // Gravity — accelerates downward each frame
+        p.vy += 0.07; // Gravity — accelerates downward each frame
         p.rotation += p.rotationSpeed;
         if (elapsed > 90) p.alpha = Math.max(0, p.alpha - 0.012); // Start fading after 90 frames
         if (p.alpha > 0 && p.y < canvas.height + 20) alive++;

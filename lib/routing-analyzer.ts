@@ -24,9 +24,9 @@ const ROUTING_MODEL_LABELS: Record<string, string> = {
 // RoutingType describes HOW the routing decision is made (the mechanism).
 // RoutingModel describes the agent-selection algorithm within that mechanism.
 const ROUTING_TYPE_LABELS: Record<string, string> = {
-  QueueBased:      "Queue-Based",
-  SkillsBased:     "Skills-Based",
-  OmniFlow:        "Omni-Channel Flow",
+  QueueBased: "Queue-Based",
+  SkillsBased: "Skills-Based",
+  OmniFlow: "Omni-Channel Flow",
   ExternalRouting: "External Routing",
 };
 
@@ -40,20 +40,28 @@ function routingTypeLabel(type: string | null): string {
 }
 
 function isExternal(trace: RoutingTrace): boolean {
-  return trace.routingType === "ExternalRouting" || trace.routingModel === "ExternalRouting";
+  return (
+    trace.routingType === "ExternalRouting" ||
+    trace.routingModel === "ExternalRouting"
+  );
 }
-
 
 // ─── analyzeLeg ──────────────────────────────────────────────────────────────
 
 // Produces per-leg routing flags from the flat RoutingLeg shape.
 // Checks external routing, timing, capacity, and skill mismatches.
-export function analyzeLeg(leg: RoutingLeg, _chain: RoutingChain): RoutingFlag[] {
+export function analyzeLeg(
+  leg: RoutingLeg,
+  _chain: RoutingChain,
+): RoutingFlag[] {
   const flags: RoutingFlag[] = [];
   const n = leg.legIndex + 1;
   const legLabel = leg.isAI ? `Leg ${n} (AI)` : `Leg ${n}`;
 
-  if (leg.routingType === "ExternalRouting" || leg.routingModel === "ExternalRouting") {
+  if (
+    leg.routingType === "ExternalRouting" ||
+    leg.routingModel === "ExternalRouting"
+  ) {
     flags.push({
       type: "warning",
       message: `${legLabel}: This leg used External Routing. Salesforce did not control the routing decision — an external system determined the assignment.`,

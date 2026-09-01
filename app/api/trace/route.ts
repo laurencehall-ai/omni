@@ -19,10 +19,14 @@ export async function GET(req: NextRequest) {
   try {
     const org = await getOrgOrThrow();
     const id = new URL(req.url).searchParams.get("id");
-    if (!id) return NextResponse.json({ error: "Missing id parameter" }, { status: 400 });
+    if (!id)
+      return NextResponse.json(
+        { error: "Missing id parameter" },
+        { status: 400 },
+      );
 
     const chain = await getRoutingChain(org, id);
-    analyzeChain(chain);                // Populates leg flags in-place — no external dependency
+    analyzeChain(chain); // Populates leg flags in-place — no external dependency
     const narration = await narrateChain(chain); // May fall back if no API key
 
     return NextResponse.json({ chain, narration });

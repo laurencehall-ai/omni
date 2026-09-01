@@ -8,13 +8,18 @@ export async function GET(req: NextRequest) {
   const org = await getOrgOrThrow();
   const res = await fetch(
     `${org.instanceUrl}/services/data/${API_VERSION}/sobjects/${obj}/describe`,
-    { headers: { Authorization: `Bearer ${org.accessToken}` }, cache: "no-store" }
+    {
+      headers: { Authorization: `Bearer ${org.accessToken}` },
+      cache: "no-store",
+    },
   );
   const data = await res.json();
-  const fields = (data.fields ?? []).map((f: { name: string; type: string; relationshipName: string | null }) => ({
-    name: f.name,
-    type: f.type,
-    relationshipName: f.relationshipName,
-  }));
+  const fields = (data.fields ?? []).map(
+    (f: { name: string; type: string; relationshipName: string | null }) => ({
+      name: f.name,
+      type: f.type,
+      relationshipName: f.relationshipName,
+    }),
+  );
   return NextResponse.json(fields);
 }

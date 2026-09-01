@@ -22,11 +22,16 @@ export async function POST(req: NextRequest) {
   const { instanceUrl, clientId, clientSecret } = await req.json();
 
   if (!instanceUrl || !clientId || !clientSecret) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing required fields" },
+      { status: 400 },
+    );
   }
 
   // Normalize the instance URL — prepend https:// if the admin omitted it
-  const raw = instanceUrl.startsWith("http") ? instanceUrl : `https://${instanceUrl}`;
+  const raw = instanceUrl.startsWith("http")
+    ? instanceUrl
+    : `https://${instanceUrl}`;
   const url = new URL(raw);
 
   // Validate that the URL is actually a Salesforce domain before redirecting there
@@ -36,18 +41,28 @@ export async function POST(req: NextRequest) {
     url.hostname.endsWith(".my.salesforce.com");
 
   if (!validSFDomain) {
-    return NextResponse.json({ error: "Instance URL must be a Salesforce domain" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Instance URL must be a Salesforce domain" },
+      { status: 400 },
+    );
   }
 
   // Generate PKCE pair:
   // code_verifier = 32 random bytes encoded as base64url (URL-safe, no padding)
   // code_challenge = SHA-256 of the verifier, also base64url-encoded
   const codeVerifier = randomBytes(32).toString("base64url");
-  const codeChallenge = createHash("sha256").update(codeVerifier).digest("base64url");
+  const codeChallenge = createHash("sha256")
+    .update(codeVerifier)
+    .digest("base64url");
 
   // Store credentials and verifier in the session — needed in the callback
   const session = await getSession();
-  session._pending = { instanceUrl: url.origin, clientId, clientSecret, codeVerifier };
+  session._pending = {
+    instanceUrl: url.origin,
+    clientId,
+    clientSecret,
+    codeVerifier,
+  };
   await session.save();
 
   // Build the Salesforce authorize URL.

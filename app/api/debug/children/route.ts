@@ -8,13 +8,22 @@ export async function GET(req: NextRequest) {
   const org = await getOrgOrThrow();
   const res = await fetch(
     `${org.instanceUrl}/services/data/${API_VERSION}/sobjects/${obj}/describe`,
-    { headers: { Authorization: `Bearer ${org.accessToken}` }, cache: "no-store" }
+    {
+      headers: { Authorization: `Bearer ${org.accessToken}` },
+      cache: "no-store",
+    },
   );
   const data = await res.json();
-  const children = (data.childRelationships ?? []).map((r: { childSObject: string; relationshipName: string | null; field: string }) => ({
-    childSObject: r.childSObject,
-    relationshipName: r.relationshipName,
-    field: r.field,
-  }));
+  const children = (data.childRelationships ?? []).map(
+    (r: {
+      childSObject: string;
+      relationshipName: string | null;
+      field: string;
+    }) => ({
+      childSObject: r.childSObject,
+      relationshipName: r.relationshipName,
+      field: r.field,
+    }),
+  );
   return NextResponse.json(children);
 }

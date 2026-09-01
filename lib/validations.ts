@@ -6,7 +6,7 @@
 // from flagged, and vice versa. This prevents contradictory badge states.
 
 const VALIDATED_KEY = "rc-validations"; // localStorage key for 👍 validated IDs
-const FLAGGED_KEY = "rc-flagged";        // localStorage key for 👎 flagged/misrouted IDs
+const FLAGGED_KEY = "rc-flagged"; // localStorage key for 👎 flagged/misrouted IDs
 
 // Reads a JSON array from localStorage and returns it as a Set.
 // Returns an empty Set if the key doesn't exist, can't be parsed, or we're on the server.
@@ -27,7 +27,9 @@ function writeSet(key: string, set: Set<string>): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(key, JSON.stringify(Array.from(set)));
-  } catch { /* localStorage unavailable (e.g. private browsing with storage blocked) */ }
+  } catch {
+    /* localStorage unavailable (e.g. private browsing with storage blocked) */
+  }
 }
 
 // Returns the set of AgentWork IDs the admin has marked as correctly routed.
@@ -42,7 +44,10 @@ export function markValidated(id: string): void {
   s.add(id);
   writeSet(VALIDATED_KEY, s);
   const f = readSet(FLAGGED_KEY);
-  if (f.has(id)) { f.delete(id); writeSet(FLAGGED_KEY, f); }
+  if (f.has(id)) {
+    f.delete(id);
+    writeSet(FLAGGED_KEY, f);
+  }
 }
 
 // Returns the set of AgentWork IDs the admin has flagged as misrouted.
@@ -57,7 +62,10 @@ export function markFlagged(id: string): void {
   f.add(id);
   writeSet(FLAGGED_KEY, f);
   const v = readSet(VALIDATED_KEY);
-  if (v.has(id)) { v.delete(id); writeSet(VALIDATED_KEY, v); }
+  if (v.has(id)) {
+    v.delete(id);
+    writeSet(VALIDATED_KEY, v);
+  }
 }
 
 // Clears both validated and flagged sets — used by the "Reset validations" button.
@@ -66,5 +74,7 @@ export function clearValidations(): void {
   try {
     localStorage.removeItem(VALIDATED_KEY);
     localStorage.removeItem(FLAGGED_KEY);
-  } catch { /* localStorage unavailable */ }
+  } catch {
+    /* localStorage unavailable */
+  }
 }

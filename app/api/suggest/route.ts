@@ -21,9 +21,16 @@ export async function POST(req: NextRequest) {
   try {
     const org = await getOrgOrThrow();
     const body = await req.json();
-    const { agentWorkId, correction }: { agentWorkId: string; correction: CorrectionInput } = body;
+    const {
+      agentWorkId,
+      correction,
+    }: { agentWorkId: string; correction: CorrectionInput } = body;
 
-    if (!agentWorkId) return NextResponse.json({ error: "Missing agentWorkId" }, { status: 400 });
+    if (!agentWorkId)
+      return NextResponse.json(
+        { error: "Missing agentWorkId" },
+        { status: 400 },
+      );
 
     // Re-fetch the trace here (not passed from client) to ensure we have fresh data
     // and so the client can't inject routing data
@@ -32,7 +39,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(suggestion);
   } catch (e) {
-
     const msg = e instanceof Error ? e.message : "Unknown error";
     const status = msg.includes("No org connected") ? 401 : 500;
     return NextResponse.json({ error: msg }, { status });

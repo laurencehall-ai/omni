@@ -16,14 +16,14 @@ import { RoutingTrace } from "./types";
 // The complete whitelist of RoutingTrace fields that are safe to send to Claude.
 // Any field not listed here is implicitly excluded.
 const SAFE_FIELDS: (keyof RoutingTrace)[] = [
-  "workItemType",          // e.g. "Case" — the type of work, not the case content
+  "workItemType", // e.g. "Case" — the type of work, not the case content
   // sfWorkItemId intentionally excluded — it's a SF record ID that could identify a customer
-  "channelLabel",          // e.g. "Phone" — the service channel name
-  "queueName",             // e.g. "Tier 1 Support" — the queue name
-  "agentName",             // Admins are the users — agent names are safe
+  "channelLabel", // e.g. "Phone" — the service channel name
+  "queueName", // e.g. "Tier 1 Support" — the queue name
+  "agentName", // Admins are the users — agent names are safe
   "agentUsername",
-  "routingModel",          // LeastActive, MostAvailable, etc.
-  "routingType",           // QueueBased, SkillsBased, OmniFlow, ExternalRouting
+  "routingModel", // LeastActive, MostAvailable, etc.
+  "routingType", // QueueBased, SkillsBased, OmniFlow, ExternalRouting
   "capacityWeight",
   "capacityPercentage",
   "createdDate",
@@ -31,7 +31,7 @@ const SAFE_FIELDS: (keyof RoutingTrace)[] = [
   "timeToAcceptSeconds",
   "routingConfigName",
   "routingConfigPriority",
-  "requiredSkills",        // Skill names (not customer attributes)
+  "requiredSkills", // Skill names (not customer attributes)
   "agentSkills",
   "status",
 ];

@@ -7,13 +7,16 @@ import { Suspense } from "react";
 const ERROR_MESSAGES: Record<string, string> = {
   no_code: "Salesforce did not return an authorization code. Please try again.",
   session_expired: "Session expired. Please try connecting again.",
-  token_exchange_failed: "Could not exchange the authorization code. Check your Client ID and Secret.",
+  token_exchange_failed:
+    "Could not exchange the authorization code. Check your Client ID and Secret.",
 };
 
 function ConnectForm() {
   const searchParams = useSearchParams();
   const errorKey = searchParams.get("error");
-  const errorMessage = errorKey ? (ERROR_MESSAGES[errorKey] ?? `Salesforce error: ${errorKey}`) : null;
+  const errorMessage = errorKey
+    ? (ERROR_MESSAGES[errorKey] ?? `Salesforce error: ${errorKey}`)
+    : null;
 
   const [instanceUrl, setInstanceUrl] = useState("");
   const [clientId, setClientId] = useState("");
@@ -47,20 +50,41 @@ function ConnectForm() {
 
   return (
     <div className="max-w-lg mx-auto mt-12">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Connect Your Salesforce Org</h1>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+        Connect Your Salesforce Org
+      </h1>
       <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm">
-        RouteCause connects to your org via a Salesforce Connected App. Your credentials are stored only in your session and never persisted to disk.
+        RouteCause connects to your org via a Salesforce Connected App. Your
+        credentials are stored only in your session and never persisted to disk.
       </p>
 
       {/* Setup checklist */}
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-        <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">Before connecting, create a Connected App in your org:</p>
+        <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">
+          Before connecting, create a Connected App in your org:
+        </p>
         <ol className="text-sm text-blue-700 dark:text-blue-400 list-decimal list-inside space-y-1">
-          <li>Go to <strong>Setup → App Manager → New Connected App</strong></li>
-          <li>Enable <strong>OAuth Settings</strong></li>
-          <li>Set callback URL to: <code className="bg-blue-100 dark:bg-blue-900/40 px-1 rounded">{process.env.NEXT_PUBLIC_CALLBACK_URL ?? "http://localhost:3000/api/auth/callback"}</code></li>
-          <li>Add OAuth scopes: <strong>api</strong>, <strong>refresh_token</strong>, <strong>offline_access</strong></li>
-          <li>Save and copy the <strong>Consumer Key</strong> (Client ID) and <strong>Consumer Secret</strong></li>
+          <li>
+            Go to <strong>Setup → App Manager → New Connected App</strong>
+          </li>
+          <li>
+            Enable <strong>OAuth Settings</strong>
+          </li>
+          <li>
+            Set callback URL to:{" "}
+            <code className="bg-blue-100 dark:bg-blue-900/40 px-1 rounded">
+              {process.env.NEXT_PUBLIC_CALLBACK_URL ??
+                "http://localhost:3000/api/auth/callback"}
+            </code>
+          </li>
+          <li>
+            Add OAuth scopes: <strong>api</strong>,{" "}
+            <strong>refresh_token</strong>, <strong>offline_access</strong>
+          </li>
+          <li>
+            Save and copy the <strong>Consumer Key</strong> (Client ID) and{" "}
+            <strong>Consumer Secret</strong>
+          </li>
         </ol>
       </div>
 

@@ -21,7 +21,9 @@ export default function ThemeToggle() {
     setMounted(true);
     // Read saved preference; fall back to OS preference if none stored
     const saved = localStorage.getItem("rc-theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const prefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)",
+    ).matches;
     const isDark = saved ? saved === "dark" : prefersDark;
     setDark(isDark);
     document.documentElement.classList.toggle("dark", isDark);

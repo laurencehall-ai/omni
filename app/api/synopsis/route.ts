@@ -16,7 +16,8 @@ import { narrateSynopsis } from "@/lib/claude";
 
 export async function GET() {
   const session = await getSession();
-  if (!session.org) return NextResponse.json({ error: "Not connected" }, { status: 401 });
+  if (!session.org)
+    return NextResponse.json({ error: "Not connected" }, { status: 401 });
 
   const synopsis = await getOrgSynopsis(session.org);
   const narration = await narrateSynopsis(synopsis);

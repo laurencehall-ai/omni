@@ -11,7 +11,7 @@ const API_VERSION = "v62.0";
 // Throws if the request fails — callers handle errors.
 export async function sfQuery<T>(
   org: OrgConnection,
-  soql: string
+  soql: string,
 ): Promise<T[]> {
   const url = `${org.instanceUrl}/services/data/${API_VERSION}/query?q=${encodeURIComponent(soql)}`;
   const res = await fetch(url, {
@@ -33,7 +33,7 @@ export async function sfQuery<T>(
 // they ultimately require Metadata API (SOAP). This is used as a best-effort attempt.
 export async function sfToolingQuery<T>(
   org: OrgConnection,
-  soql: string
+  soql: string,
 ): Promise<T[]> {
   const url = `${org.instanceUrl}/services/data/${API_VERSION}/tooling/query?q=${encodeURIComponent(soql)}`;
   const res = await fetch(url, {
@@ -52,7 +52,7 @@ export async function sfToolingQuery<T>(
 // Called when a session token has expired (e.g. the "invalid session ID" error).
 // NOTE: Currently unused in the app — reconnecting via OAuth is the preferred flow.
 export async function refreshAccessToken(
-  org: OrgConnection
+  org: OrgConnection,
 ): Promise<OrgConnection> {
   const params = new URLSearchParams({
     grant_type: "refresh_token",
