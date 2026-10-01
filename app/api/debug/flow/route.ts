@@ -16,9 +16,9 @@ interface FlowDefRow {
   Description: string | null;
 }
 
-interface FlowVersionListRow {
+interface FlowRow {
   Id: string;
-  FlowDefinitionId: string;
+  DefinitionId: string;
   VersionNumber: number;
   Status: string;
   ProcessType: string;
@@ -58,30 +58,42 @@ export async function GET(req: NextRequest) {
     const flowName = searchParams.get("name");
 
     if (!flowName) {
-      // ProcessType lives on FlowVersion, not FlowDefinition
-      const versions = await sfToolingQuery<FlowVersionListRow>(
-        org,
-        `SELECT Id, FlowDefinitionId, VersionNumber, Status, ProcessType
-         FROM FlowVersion
-         WHERE ProcessType = 'OmniChannelFlow'
-         ORDER BY FlowDefinitionId, VersionNumber DESC
-         LIMIT 100`,
-      );
+      // Flow (not FlowVersion) is the correct Tooling API object for versioned flows
+      // ProcessType value is "OmniChannelFlow" (no spaces/hyphens in the API value)
+      // Try both known variants since different orgs may report differently
+      let flows: FlowRow[] = [];
+      let usedProcessType = "";
+      for (const pt of ["OmniChannelFlow", "Omni-Channel Flow", "OmniChannel"]) {
+        try {
+          flows = await sfToolingQuery<FlowRow>(
+            org,
+            `SELECT Id, DefinitionId, VersionNumber, Status, ProcessType
+             FROM Flow
+             WHERE ProcessType = '${pt}'
+             ORDER BY DefinitionId, VersionNumber DESC
+             LIMIT 100`,
+          );
+          if (flows.length > 0) { usedProcessType = pt; break; }
+          usedProcessType = pt;
+        } catch {
+          // try next value
+        }
+      }
 
-      // Dedupe to one entry per FlowDefinition (latest version)
+      // Dedupe to one entry per DefinitionId (latest version)
       const seen = new Set<string>();
-      const unique = versions.filter((v) => {
-        if (seen.has(v.FlowDefinitionId)) return false;
-        seen.add(v.FlowDefinitionId);
+      const unique = flows.filter((v) => {
+        if (seen.has(v.DefinitionId)) return false;
+        seen.add(v.DefinitionId);
         return true;
       });
 
-      // Fetch the DeveloperNames for those definition IDs
-      const defIds = unique.map((v) => `'${v.FlowDefinitionId}'`).join(", ");
+      // Fetch DeveloperNames
+      const defIds = unique.map((v) => `'${v.DefinitionId}'`).join(", ");
       const defs = defIds.length
         ? await sfToolingQuery<FlowDefRow>(
             org,
-            `SELECT Id, DeveloperName, MasterLabel, Description
+            `SELECT Id, DeveloperName, MasterLabel
              FROM FlowDefinition
              WHERE Id IN (${defIds})`,
           )
@@ -91,10 +103,11 @@ export async function GET(req: NextRequest) {
 
       return NextResponse.json({
         count: unique.length,
+        usedProcessType,
         omniChannelFlows: unique.map((v) => ({
-          flowDefinitionId: v.FlowDefinitionId,
-          developerName: defMap[v.FlowDefinitionId]?.DeveloperName ?? null,
-          label: defMap[v.FlowDefinitionId]?.MasterLabel ?? null,
+          definitionId: v.DefinitionId,
+          developerName: defMap[v.DefinitionId]?.DeveloperName ?? null,
+          label: defMap[v.DefinitionId]?.MasterLabel ?? null,
           latestVersionId: v.Id,
           latestVersionNumber: v.VersionNumber,
           status: v.Status,
@@ -127,8 +140,8 @@ export async function GET(req: NextRequest) {
       versionRows = await sfToolingQuery<FlowVersionRow>(
         org,
         `SELECT Id, VersionNumber, Status, CreatedDate, LastModifiedDate
-         FROM FlowVersion
-         WHERE FlowDefinitionId = '${def.Id}'
+         FROM Flow
+         WHERE DefinitionId = '${def.Id}'
          AND Status = 'Active'
          LIMIT 1`,
       );
@@ -140,8 +153,8 @@ export async function GET(req: NextRequest) {
       versionRows = await sfToolingQuery<FlowVersionRow>(
         org,
         `SELECT Id, VersionNumber, Status, CreatedDate, LastModifiedDate
-         FROM FlowVersion
-         WHERE FlowDefinitionId = '${def.Id}'
+         FROM Flow
+         WHERE DefinitionId = '${def.Id}'
          ORDER BY VersionNumber DESC
          LIMIT 1`,
       );
@@ -149,7 +162,7 @@ export async function GET(req: NextRequest) {
 
     if (!versionRows.length) {
       return NextResponse.json(
-        { error: "No FlowVersion found for this flow", flow: def },
+        { error: "No Flow version found for this flow", flow: def },
         { status: 422 },
       );
     }
