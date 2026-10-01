@@ -58,40 +58,48 @@ export async function GET(req: NextRequest) {
     const flowName = searchParams.get("name");
 
     if (!flowName) {
-      // Fetch up to 2000 records to find all ProcessType values
+      // ProcessType = 'RoutingFlow' is the correct value for OmniChannel routing flows
       const flows = await sfToolingQuery<FlowRow>(
         org,
         `SELECT Id, DefinitionId, VersionNumber, Status, ProcessType
          FROM Flow
-         ORDER BY ProcessType, VersionNumber DESC
-         LIMIT 2000`,
+         WHERE ProcessType = 'RoutingFlow'
+         AND Status = 'Active'
+         ORDER BY DefinitionId, VersionNumber DESC
+         LIMIT 100`,
       );
 
-      const byProcessType: Record<string, number> = {};
-      for (const f of flows) {
-        byProcessType[f.ProcessType] = (byProcessType[f.ProcessType] ?? 0) + 1;
-      }
+      // Dedupe to latest active version per DefinitionId
+      const seen = new Set<string>();
+      const unique = flows.filter((v) => {
+        if (seen.has(v.DefinitionId)) return false;
+        seen.add(v.DefinitionId);
+        return true;
+      });
 
-      // Also try a direct query for the known ProcessType string
-      const directHits: FlowRow[] = [];
-      for (const pt of ["Omni-Channel Flow", "OmniChannelFlow", "OmniChannel", "RoutingFlow"]) {
-        try {
-          const rows = await sfToolingQuery<FlowRow>(
+      // Fetch DeveloperNames for those definitions
+      const defIds = unique.map((v) => `'${v.DefinitionId}'`).join(", ");
+      const defs = defIds.length
+        ? await sfToolingQuery<FlowDefRow>(
             org,
-            `SELECT Id, DefinitionId, VersionNumber, Status, ProcessType
-             FROM Flow
-             WHERE ProcessType = '${pt}'
-             LIMIT 10`,
-          );
-          directHits.push(...rows);
-        } catch { /* not a valid value */ }
-      }
+            `SELECT Id, DeveloperName, MasterLabel
+             FROM FlowDefinition
+             WHERE Id IN (${defIds})`,
+          )
+        : [];
+
+      const defMap = Object.fromEntries(defs.map((d) => [d.Id, d]));
 
       return NextResponse.json({
-        totalFlowVersions: flows.length,
-        distinctProcessTypes: byProcessType,
-        directHits: directHits.map((f) => ({ id: f.Id, processType: f.ProcessType })),
-        hint: "?name=DeveloperName to inspect a specific flow",
+        count: unique.length,
+        routingFlows: unique.map((v) => ({
+          developerName: defMap[v.DefinitionId]?.DeveloperName ?? null,
+          label: defMap[v.DefinitionId]?.MasterLabel ?? null,
+          versionId: v.Id,
+          versionNumber: v.VersionNumber,
+          status: v.Status,
+        })),
+        hint: "Add ?name=DeveloperName to get full element + connector graph",
       });
     }
 
