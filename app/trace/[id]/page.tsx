@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react"; // v2
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   RoutingChain,
