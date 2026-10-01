@@ -58,25 +58,40 @@ export async function GET(req: NextRequest) {
     const flowName = searchParams.get("name");
 
     if (!flowName) {
-      // Sample all Flow records to discover what ProcessType values exist
+      // Fetch up to 2000 records to find all ProcessType values
       const flows = await sfToolingQuery<FlowRow>(
         org,
         `SELECT Id, DefinitionId, VersionNumber, Status, ProcessType
          FROM Flow
          ORDER BY ProcessType, VersionNumber DESC
-         LIMIT 200`,
+         LIMIT 2000`,
       );
 
-      // Count distinct ProcessType values
       const byProcessType: Record<string, number> = {};
       for (const f of flows) {
         byProcessType[f.ProcessType] = (byProcessType[f.ProcessType] ?? 0) + 1;
       }
 
+      // Also try a direct query for the known ProcessType string
+      const directHits: FlowRow[] = [];
+      for (const pt of ["Omni-Channel Flow", "OmniChannelFlow", "OmniChannel", "RoutingFlow"]) {
+        try {
+          const rows = await sfToolingQuery<FlowRow>(
+            org,
+            `SELECT Id, DefinitionId, VersionNumber, Status, ProcessType
+             FROM Flow
+             WHERE ProcessType = '${pt}'
+             LIMIT 10`,
+          );
+          directHits.push(...rows);
+        } catch { /* not a valid value */ }
+      }
+
       return NextResponse.json({
         totalFlowVersions: flows.length,
         distinctProcessTypes: byProcessType,
-        hint: "Find your ProcessType value above, then add ?processType=YourValue to filter, or ?name=DeveloperName to inspect a specific flow",
+        directHits: directHits.map((f) => ({ id: f.Id, processType: f.ProcessType })),
+        hint: "?name=DeveloperName to inspect a specific flow",
       });
     }
 
