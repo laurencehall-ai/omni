@@ -58,61 +58,25 @@ export async function GET(req: NextRequest) {
     const flowName = searchParams.get("name");
 
     if (!flowName) {
-      // Flow (not FlowVersion) is the correct Tooling API object for versioned flows
-      // ProcessType value is "OmniChannelFlow" (no spaces/hyphens in the API value)
-      // Try both known variants since different orgs may report differently
-      let flows: FlowRow[] = [];
-      let usedProcessType = "";
-      for (const pt of ["OmniChannelFlow", "Omni-Channel Flow", "OmniChannel"]) {
-        try {
-          flows = await sfToolingQuery<FlowRow>(
-            org,
-            `SELECT Id, DefinitionId, VersionNumber, Status, ProcessType
-             FROM Flow
-             WHERE ProcessType = '${pt}'
-             ORDER BY DefinitionId, VersionNumber DESC
-             LIMIT 100`,
-          );
-          if (flows.length > 0) { usedProcessType = pt; break; }
-          usedProcessType = pt;
-        } catch {
-          // try next value
-        }
+      // Sample all Flow records to discover what ProcessType values exist
+      const flows = await sfToolingQuery<FlowRow>(
+        org,
+        `SELECT Id, DefinitionId, VersionNumber, Status, ProcessType
+         FROM Flow
+         ORDER BY ProcessType, VersionNumber DESC
+         LIMIT 200`,
+      );
+
+      // Count distinct ProcessType values
+      const byProcessType: Record<string, number> = {};
+      for (const f of flows) {
+        byProcessType[f.ProcessType] = (byProcessType[f.ProcessType] ?? 0) + 1;
       }
 
-      // Dedupe to one entry per DefinitionId (latest version)
-      const seen = new Set<string>();
-      const unique = flows.filter((v) => {
-        if (seen.has(v.DefinitionId)) return false;
-        seen.add(v.DefinitionId);
-        return true;
-      });
-
-      // Fetch DeveloperNames
-      const defIds = unique.map((v) => `'${v.DefinitionId}'`).join(", ");
-      const defs = defIds.length
-        ? await sfToolingQuery<FlowDefRow>(
-            org,
-            `SELECT Id, DeveloperName, MasterLabel
-             FROM FlowDefinition
-             WHERE Id IN (${defIds})`,
-          )
-        : [];
-
-      const defMap = Object.fromEntries(defs.map((d) => [d.Id, d]));
-
       return NextResponse.json({
-        count: unique.length,
-        usedProcessType,
-        omniChannelFlows: unique.map((v) => ({
-          definitionId: v.DefinitionId,
-          developerName: defMap[v.DefinitionId]?.DeveloperName ?? null,
-          label: defMap[v.DefinitionId]?.MasterLabel ?? null,
-          latestVersionId: v.Id,
-          latestVersionNumber: v.VersionNumber,
-          status: v.Status,
-        })),
-        hint: "Add ?name=DeveloperName to get full element + connector graph",
+        totalFlowVersions: flows.length,
+        distinctProcessTypes: byProcessType,
+        hint: "Find your ProcessType value above, then add ?processType=YourValue to filter, or ?name=DeveloperName to inspect a specific flow",
       });
     }
 
