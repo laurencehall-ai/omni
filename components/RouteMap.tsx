@@ -229,12 +229,10 @@ interface FlowData {
 }
 
 export default function RouteMap({ chain }: { chain: RoutingChain }) {
-  const isOmniFlow = chain.legs.some((l) => l.routingType === "OmniFlow");
   const [flowData, setFlowData] = useState<FlowData | null>(null);
-  const [flowLoading, setFlowLoading] = useState(false);
+  const [flowLoading, setFlowLoading] = useState(true);
 
   useEffect(() => {
-    if (!isOmniFlow) return;
     setFlowLoading(true);
     fetch(`/api/flow?agentWorkId=${chain.entryAgentWorkId}`)
       .then((r) => r.json())
@@ -243,11 +241,12 @@ export default function RouteMap({ chain }: { chain: RoutingChain }) {
           setFlowData({ graph: data.graph, flowLabel: data.flowLabel ?? null });
         }
       })
-      .catch(() => {
-        // silently fall through to placeholder
-      })
+      .catch(() => {/* silently omit diagram */})
       .finally(() => setFlowLoading(false));
-  }, [isOmniFlow, chain.entryAgentWorkId]);
+  }, [chain.entryAgentWorkId]);
+
+  // Show diagram block if: still loading, or a flow was found
+  const showFlowBlock = flowLoading || flowData !== null;
 
   return (
     <div className="space-y-3">
@@ -256,17 +255,15 @@ export default function RouteMap({ chain }: { chain: RoutingChain }) {
 
       <Connector />
 
-      {/* Block 2: OmniFlow diagram */}
-      {isOmniFlow && (
+      {/* Block 2: OmniFlow diagram — shown if a matching RoutingFlow exists */}
+      {showFlowBlock && (
         <>
           {flowLoading ? (
             <OmniFlowSkeleton />
           ) : flowData ? (
             <OmniFlowDiagram graph={flowData.graph} flowLabel={flowData.flowLabel} />
-          ) : (
-            <OmniFlowPlaceholder />
-          )}
-          <Connector />
+          ) : null}
+          {flowData && <Connector />}
         </>
       )}
 
