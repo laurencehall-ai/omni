@@ -14,7 +14,6 @@ interface FlowDefRow {
   DeveloperName: string;
   MasterLabel: string;
   Description: string | null;
-  ProcessType: string | null;
 }
 
 interface FlowVersionRow {
@@ -53,31 +52,23 @@ export async function GET(req: NextRequest) {
     if (!flowName) {
       const defs = await sfToolingQuery<FlowDefRow>(
         org,
-        `SELECT Id, DeveloperName, MasterLabel, Description, ProcessType
+        `SELECT Id, DeveloperName, MasterLabel, Description
          FROM FlowDefinition
-         ORDER BY ProcessType, DeveloperName
-         LIMIT 200`,
+         ORDER BY DeveloperName
+         LIMIT 500`,
       );
-      const omniFlows = defs.filter((d) =>
-        d.ProcessType === "OmniChannelFlow" ||
-        d.DeveloperName.toLowerCase().includes("omni") ||
-        d.DeveloperName.toLowerCase().includes("routing")
+      // Best-effort filter for likely OmniChannel routing flows
+      const likely = defs.filter((d) =>
+        /omni|routing|route|channel|queue|skill/i.test(d.DeveloperName)
       );
       return NextResponse.json({
         totalCount: defs.length,
-        omniFlowCount: omniFlows.length,
-        omniFlows: omniFlows.map((d) => ({
+        likelyOmniFlows: likely.map((d) => ({
           id: d.Id,
           developerName: d.DeveloperName,
           label: d.MasterLabel,
-          processType: d.ProcessType,
         })),
-        allByProcessType: defs.reduce<Record<string, string[]>>((acc, d) => {
-          const type = d.ProcessType ?? "null";
-          acc[type] = acc[type] ?? [];
-          acc[type].push(d.DeveloperName);
-          return acc;
-        }, {}),
+        allFlows: defs.map((d) => d.DeveloperName),
         hint: "Add ?name=DeveloperName to get full element + connector graph",
       });
     }
@@ -85,7 +76,7 @@ export async function GET(req: NextRequest) {
     // Look up the named flow
     const defs = await sfToolingQuery<FlowDefRow>(
       org,
-      `SELECT Id, DeveloperName, MasterLabel, Description, ProcessType
+      `SELECT Id, DeveloperName, MasterLabel, Description
        FROM FlowDefinition
        WHERE DeveloperName = '${flowName.replace(/'/g, "\\'")}'
        LIMIT 1`,
