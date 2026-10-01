@@ -14,6 +14,7 @@ interface FlowDefRow {
   DeveloperName: string;
   MasterLabel: string;
   Description: string | null;
+  ProcessType: string | null;
 }
 
 interface FlowVersionRow {
@@ -52,18 +53,31 @@ export async function GET(req: NextRequest) {
     if (!flowName) {
       const defs = await sfToolingQuery<FlowDefRow>(
         org,
-        `SELECT Id, DeveloperName, MasterLabel, Description
+        `SELECT Id, DeveloperName, MasterLabel, Description, ProcessType
          FROM FlowDefinition
-         LIMIT 50`,
+         ORDER BY ProcessType, DeveloperName
+         LIMIT 200`,
+      );
+      const omniFlows = defs.filter((d) =>
+        d.ProcessType === "OmniChannelFlow" ||
+        d.DeveloperName.toLowerCase().includes("omni") ||
+        d.DeveloperName.toLowerCase().includes("routing")
       );
       return NextResponse.json({
-        count: defs.length,
-        flows: defs.map((d) => ({
+        totalCount: defs.length,
+        omniFlowCount: omniFlows.length,
+        omniFlows: omniFlows.map((d) => ({
           id: d.Id,
           developerName: d.DeveloperName,
           label: d.MasterLabel,
-          description: d.Description,
+          processType: d.ProcessType,
         })),
+        allByProcessType: defs.reduce<Record<string, string[]>>((acc, d) => {
+          const type = d.ProcessType ?? "null";
+          acc[type] = acc[type] ?? [];
+          acc[type].push(d.DeveloperName);
+          return acc;
+        }, {}),
         hint: "Add ?name=DeveloperName to get full element + connector graph",
       });
     }
@@ -71,7 +85,7 @@ export async function GET(req: NextRequest) {
     // Look up the named flow
     const defs = await sfToolingQuery<FlowDefRow>(
       org,
-      `SELECT Id, DeveloperName, MasterLabel, Description
+      `SELECT Id, DeveloperName, MasterLabel, Description, ProcessType
        FROM FlowDefinition
        WHERE DeveloperName = '${flowName.replace(/'/g, "\\'")}'
        LIMIT 1`,
