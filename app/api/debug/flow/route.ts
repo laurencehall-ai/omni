@@ -51,6 +51,18 @@ interface FlowConnectorRow {
   IsDefaultFlow: boolean;
 }
 
+async function fetchJson(url: string, token: string) {
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Tooling API error (${res.status}): ${body}`);
+  }
+  return res.json();
+}
+
 export async function GET(req: NextRequest) {
   try {
     const org = await getOrgOrThrow();
@@ -156,41 +168,27 @@ export async function GET(req: NextRequest) {
 
     const version = versionRows[0];
 
-    // Fetch elements (nodes)
-    let elements: FlowElementRow[] = [];
-    let elementError: string | null = null;
-    try {
-      elements = await sfToolingQuery<FlowElementRow>(
-        org,
-        `SELECT Id, Name, Label, Type, Subtype, ElementSubtype, ProcessMetadataValues
-         FROM FlowElement
-         WHERE FlowVersionId = '${version.Id}'
-         ORDER BY Name
-         LIMIT 500`,
-      );
-    } catch (e) {
-      elementError = e instanceof Error ? e.message : String(e);
-    }
+    // FlowElement/FlowConnector aren't queryable via SOQL in all orgs.
+    // Use direct REST GET on the Flow sObject — returns full Metadata field with all nodes.
+    const flowUrl = `${org.instanceUrl}/services/data/v62.0/tooling/sobjects/Flow/${version.Id}`;
+    const flowRecord = await fetchJson(flowUrl, org.accessToken);
 
-    // Fetch connectors (edges) — soft-fail, not all orgs expose this
-    let connectors: FlowConnectorRow[] = [];
-    let connectorError: string | null = null;
-    try {
-      connectors = await sfToolingQuery<FlowConnectorRow>(
-        org,
-        `SELECT Id, Name, SourceElementId, TargetElementId, ConnectorLabel, IsDefaultFlow
-         FROM FlowConnector
-         WHERE FlowVersionId = '${version.Id}'
-         ORDER BY SourceElementId
-         LIMIT 500`,
-      );
-    } catch (e) {
-      connectorError = e instanceof Error ? e.message : String(e);
-    }
+    // The Metadata field contains the full flow definition including elements
+    const metadata = flowRecord.Metadata ?? null;
+    const elements: unknown[] = metadata?.actionCalls
+      ?? metadata?.decisions
+      ?? null;
 
-    const byType: Record<string, number> = {};
-    for (const el of elements) {
-      byType[el.Type] = (byType[el.Type] ?? 0) + 1;
+    // Summarise top-level keys in Metadata so we can see what's available
+    const metadataKeys = metadata ? Object.keys(metadata) : [];
+    const elementTypeSummary: Record<string, number> = {};
+    if (metadata) {
+      for (const key of metadataKeys) {
+        const val = metadata[key];
+        if (Array.isArray(val) && val.length > 0) {
+          elementTypeSummary[key] = val.length;
+        }
+      }
     }
 
     return NextResponse.json({
@@ -207,13 +205,9 @@ export async function GET(req: NextRequest) {
         createdDate: version.CreatedDate,
         lastModifiedDate: version.LastModifiedDate,
       },
-      elementCount: elements.length,
-      connectorCount: connectors.length,
-      elementTypesSummary: byType,
-      ...(elementError ? { elementError } : {}),
-      ...(connectorError ? { connectorError } : {}),
-      elements,
-      connectors,
+      metadataKeys,
+      elementTypeSummary,
+      metadata,
     });
   } catch (e) {
     return NextResponse.json(
