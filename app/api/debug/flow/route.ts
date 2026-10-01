@@ -16,6 +16,14 @@ interface FlowDefRow {
   Description: string | null;
 }
 
+interface FlowVersionListRow {
+  Id: string;
+  FlowDefinitionId: string;
+  VersionNumber: number;
+  Status: string;
+  ProcessType: string;
+}
+
 interface FlowVersionRow {
   Id: string;
   VersionNumber: number;
@@ -50,25 +58,47 @@ export async function GET(req: NextRequest) {
     const flowName = searchParams.get("name");
 
     if (!flowName) {
-      const defs = await sfToolingQuery<FlowDefRow>(
+      // ProcessType lives on FlowVersion, not FlowDefinition
+      const versions = await sfToolingQuery<FlowVersionListRow>(
         org,
-        `SELECT Id, DeveloperName, MasterLabel, Description
-         FROM FlowDefinition
-         ORDER BY DeveloperName
-         LIMIT 500`,
+        `SELECT Id, FlowDefinitionId, VersionNumber, Status, ProcessType
+         FROM FlowVersion
+         WHERE ProcessType = 'OmniChannelFlow'
+         ORDER BY FlowDefinitionId, VersionNumber DESC
+         LIMIT 100`,
       );
-      // Best-effort filter for likely OmniChannel routing flows
-      const likely = defs.filter((d) =>
-        /omni|routing|route|channel|queue|skill/i.test(d.DeveloperName)
-      );
+
+      // Dedupe to one entry per FlowDefinition (latest version)
+      const seen = new Set<string>();
+      const unique = versions.filter((v) => {
+        if (seen.has(v.FlowDefinitionId)) return false;
+        seen.add(v.FlowDefinitionId);
+        return true;
+      });
+
+      // Fetch the DeveloperNames for those definition IDs
+      const defIds = unique.map((v) => `'${v.FlowDefinitionId}'`).join(", ");
+      const defs = defIds.length
+        ? await sfToolingQuery<FlowDefRow>(
+            org,
+            `SELECT Id, DeveloperName, MasterLabel, Description
+             FROM FlowDefinition
+             WHERE Id IN (${defIds})`,
+          )
+        : [];
+
+      const defMap = Object.fromEntries(defs.map((d) => [d.Id, d]));
+
       return NextResponse.json({
-        totalCount: defs.length,
-        likelyOmniFlows: likely.map((d) => ({
-          id: d.Id,
-          developerName: d.DeveloperName,
-          label: d.MasterLabel,
+        count: unique.length,
+        omniChannelFlows: unique.map((v) => ({
+          flowDefinitionId: v.FlowDefinitionId,
+          developerName: defMap[v.FlowDefinitionId]?.DeveloperName ?? null,
+          label: defMap[v.FlowDefinitionId]?.MasterLabel ?? null,
+          latestVersionId: v.Id,
+          latestVersionNumber: v.VersionNumber,
+          status: v.Status,
         })),
-        allFlows: defs.map((d) => d.DeveloperName),
         hint: "Add ?name=DeveloperName to get full element + connector graph",
       });
     }
