@@ -1,7 +1,45 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { RoutingChain, RoutingLeg } from "@/lib/types";
+import { FlowGraphWithPath } from "@/lib/flow-types";
 import { formatDate, formatDuration } from "@/lib/utils";
+
+// ─── OmniFlow states ──────────────────────────────────────────────────────────
+// Defined before dynamic() so the loading fallback can reference OmniFlowSkeleton.
+
+function OmniFlowSkeleton() {
+  return (
+    <div className="h-[380px] bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl flex items-center justify-center">
+      <div className="flex flex-col items-center gap-2">
+        <div className="w-5 h-5 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs text-slate-400 dark:text-slate-500 font-mono">
+          Loading flow…
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function OmniFlowPlaceholder() {
+  return (
+    <div className="bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-6 text-center">
+      <p className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+        Omni-Channel Flow
+      </p>
+      <p className="text-xs text-slate-500 dark:text-slate-500 leading-relaxed max-w-xs mx-auto">
+        Flow diagram could not be loaded for this work item.
+      </p>
+    </div>
+  );
+}
+
+// ReactFlow must be client-only (no SSR). Loading fallback uses OmniFlowSkeleton.
+const OmniFlowDiagram = dynamic(() => import("./OmniFlowDiagram"), {
+  ssr: false,
+  loading: () => <OmniFlowSkeleton />,
+});
 
 // ─── Transfer type label ──────────────────────────────────────────────────────
 
@@ -183,27 +221,33 @@ function TransferBadge({ from, to }: { from: RoutingLeg; to: RoutingLeg }) {
   );
 }
 
-// ─── OmniFlow diagram (Phase 3 placeholder) ───────────────────────────────────
-
-function OmniFlowPlaceholder() {
-  return (
-    <div className="bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-6 text-center">
-      <p className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
-        Omni-Channel Flow
-      </p>
-      <p className="text-xs text-slate-500 dark:text-slate-500 leading-relaxed max-w-xs mx-auto">
-        Flow decision nodes and inferred path will be shown here in Phase 3
-        (Tooling API). The routing results below reflect where the item actually
-        landed.
-      </p>
-    </div>
-  );
-}
-
 // ─── RouteMap ─────────────────────────────────────────────────────────────────
+
+interface FlowData {
+  graph: FlowGraphWithPath;
+  flowLabel: string | null;
+}
 
 export default function RouteMap({ chain }: { chain: RoutingChain }) {
   const isOmniFlow = chain.legs.some((l) => l.routingType === "OmniFlow");
+  const [flowData, setFlowData] = useState<FlowData | null>(null);
+  const [flowLoading, setFlowLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOmniFlow) return;
+    setFlowLoading(true);
+    fetch(`/api/flow?agentWorkId=${chain.entryAgentWorkId}`)
+      .then((r) => r.json())
+      .then((data: { notFound?: boolean; error?: string; graph?: FlowGraphWithPath; flowLabel?: string }) => {
+        if (!data.notFound && !data.error && data.graph) {
+          setFlowData({ graph: data.graph, flowLabel: data.flowLabel ?? null });
+        }
+      })
+      .catch(() => {
+        // silently fall through to placeholder
+      })
+      .finally(() => setFlowLoading(false));
+  }, [isOmniFlow, chain.entryAgentWorkId]);
 
   return (
     <div className="space-y-3">
@@ -212,10 +256,16 @@ export default function RouteMap({ chain }: { chain: RoutingChain }) {
 
       <Connector />
 
-      {/* Block 2: OmniFlow placeholder */}
+      {/* Block 2: OmniFlow diagram */}
       {isOmniFlow && (
         <>
-          <OmniFlowPlaceholder />
+          {flowLoading ? (
+            <OmniFlowSkeleton />
+          ) : flowData ? (
+            <OmniFlowDiagram graph={flowData.graph} flowLabel={flowData.flowLabel} />
+          ) : (
+            <OmniFlowPlaceholder />
+          )}
           <Connector />
         </>
       )}
@@ -223,9 +273,7 @@ export default function RouteMap({ chain }: { chain: RoutingChain }) {
       {/* Block 3: Routing Results — one per leg */}
       {chain.legs.map((leg, i) => (
         <div key={leg.agentWorkId}>
-          {i > 0 && (
-            <TransferBadge from={chain.legs[i - 1]} to={leg} />
-          )}
+          {i > 0 && <TransferBadge from={chain.legs[i - 1]} to={leg} />}
           <RoutingResultsBox
             leg={leg}
             legIndex={i}

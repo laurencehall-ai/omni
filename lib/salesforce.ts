@@ -69,6 +69,27 @@ export async function refreshAccessToken(
   return { ...org, accessToken: data.access_token };
 }
 
+// Direct GET against the Tooling API — used for sObject records (e.g. Flow/{id}).
+// Supports optional revalidation for caching flow definitions (they change rarely).
+export async function sfToolingGet<T>(
+  org: OrgConnection,
+  path: string,
+  revalidateSeconds?: number,
+): Promise<T> {
+  const url = `${org.instanceUrl}/services/data/${API_VERSION}/tooling${path}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${org.accessToken}` },
+    ...(revalidateSeconds !== undefined
+      ? { next: { revalidate: revalidateSeconds } }
+      : { cache: "no-store" as const }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Tooling API error (${res.status}): ${body}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 // Maps the 3-character Salesforce record ID prefix to a human-readable work item type.
 // We inspect only the prefix — we never fetch the actual work item record's content.
 const KEY_PREFIX_MAP: Record<string, string> = {
