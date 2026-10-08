@@ -9,44 +9,37 @@ interface RawServiceChannel {
   Id: string;
   MasterLabel: string;
   RelatedEntity: string | null;
-  RoutingConfigurationId: string | null;
-  ChannelType: string | null;
-}
-
-interface RawRoutingConfig {
-  Id: string;
-  Name: string;
-  RoutingModel: string | null;
 }
 
 interface RawQueueRoutingConfig {
   Id: string;
-  QueueId: string;
-  RoutingConfigId: string;
-}
-
-interface RawQueueSobject {
-  QueueId: string;
-  SobjectType: string;
+  MasterLabel: string;
+  DeveloperName: string;
+  RoutingModel: string | null;
+  CapacityWeight: number | null;
+  IsAttributeBased: boolean | null;
 }
 
 interface RawGroup {
   Id: string;
   Name: string;
+  QueueRoutingConfigId: string | null;
 }
 
 interface RawGroupMember {
   GroupId: string;
   UserOrGroupId: string;
-  UserOrGroup: { Name: string } | null;
+}
+
+interface RawServiceResource {
+  Id: string;
+  Name: string;
+  RelatedRecordId: string;
 }
 
 interface RawServiceResourceSkill {
   ServiceResourceId: string;
-  ServiceResource: {
-    RelatedRecordId: string;
-    RelatedRecord: { Name: string } | null;
-  } | null;
+  ServiceResource: { RelatedRecordId: string } | null;
   SkillId: string;
   Skill: { MasterLabel: string } | null;
 }
@@ -62,10 +55,16 @@ interface RawSkill {
   MasterLabel: string;
 }
 
-interface RawFlowDef {
+interface RawQueueSobject {
+  QueueId: string;
+  SobjectType: string;
+}
+
+interface RawFlowVersion {
   Id: string;
-  DeveloperName: string;
-  MasterLabel: string;
+  DefinitionId: string;
+  VersionNumber: number;
+  MasterLabel: string | null;
 }
 
 // ─── tryQuery ─────────────────────────────────────────────────────────────────
@@ -101,46 +100,44 @@ function getParam(params: FlowInputParameter[], name: string): string | null {
 export async function getTopologyGraph(org: OrgConnection): Promise<TopologyGraph> {
   const unavailableObjects: string[] = [];
 
-  // Fire all base queries in parallel
   const [
     channelRes,
-    routingConfigRes,
     queueRoutingConfigRes,
-    queueSobjectRes,
     groupRes,
     groupMemberRes,
+    serviceResourceRes,
     serviceResourceSkillRes,
     skillRequirementRes,
     skillRes,
-    flowDefRes,
+    queueSobjectRes,
+    flowVersionRes,
   ] = await Promise.all([
     tryQuery<RawServiceChannel>(
       org, "ServiceChannel",
-      "SELECT Id, MasterLabel, RelatedEntity, RoutingConfigurationId, ChannelType FROM ServiceChannel LIMIT 100",
+      "SELECT Id, MasterLabel, RelatedEntity FROM ServiceChannel LIMIT 100",
     ),
-    tryQuery<RawRoutingConfig>(
-      org, "RoutingConfiguration",
-      "SELECT Id, Name, RoutingModel FROM RoutingConfiguration LIMIT 100",
-    ),
+    // QueueRoutingConfig IS the routing configuration object in this org
     tryQuery<RawQueueRoutingConfig>(
       org, "QueueRoutingConfig",
-      "SELECT Id, QueueId, RoutingConfigId FROM QueueRoutingConfig WHERE IsActive = true LIMIT 200",
+      "SELECT Id, MasterLabel, DeveloperName, RoutingModel, CapacityWeight, IsAttributeBased FROM QueueRoutingConfig LIMIT 100",
     ),
-    tryQuery<RawQueueSobject>(
-      org, "QueueSobject",
-      "SELECT QueueId, SobjectType FROM QueueSobject WHERE Queue.Type = 'Queue' LIMIT 500",
-    ),
+    // Group carries QueueRoutingConfigId — the Queue → RoutingConfig link
     tryQuery<RawGroup>(
-      org, "Queue (Group)",
-      "SELECT Id, Name FROM Group WHERE Type = 'Queue' LIMIT 200",
+      org, "Queue",
+      "SELECT Id, Name, QueueRoutingConfigId FROM Group WHERE Type = 'Queue' LIMIT 200",
     ),
     tryQuery<RawGroupMember>(
       org, "GroupMember",
-      "SELECT GroupId, UserOrGroupId, UserOrGroup.Name FROM GroupMember WHERE Group.Type = 'Queue' LIMIT 1000",
+      "SELECT GroupId, UserOrGroupId FROM GroupMember WHERE Group.Type = 'Queue' LIMIT 2000",
+    ),
+    // ServiceResource is the correct agent source (not GroupMember)
+    tryQuery<RawServiceResource>(
+      org, "ServiceResource",
+      "SELECT Id, Name, RelatedRecordId FROM ServiceResource WHERE ResourceType = 'T' AND IsActive = true LIMIT 200",
     ),
     tryQuery<RawServiceResourceSkill>(
       org, "ServiceResourceSkill",
-      "SELECT ServiceResourceId, ServiceResource.RelatedRecordId, ServiceResource.RelatedRecord.Name, SkillId, Skill.MasterLabel FROM ServiceResourceSkill WHERE ServiceResource.ResourceType = 'T' AND ServiceResource.IsActive = true LIMIT 500",
+      "SELECT ServiceResourceId, ServiceResource.RelatedRecordId, SkillId, Skill.MasterLabel FROM ServiceResourceSkill WHERE ServiceResource.ResourceType = 'T' AND ServiceResource.IsActive = true LIMIT 500",
     ),
     tryQuery<RawSkillRequirement>(
       org, "SkillRequirement",
@@ -150,20 +147,25 @@ export async function getTopologyGraph(org: OrgConnection): Promise<TopologyGrap
       org, "Skill",
       "SELECT Id, MasterLabel FROM Skill LIMIT 100",
     ),
-    tryQuery<RawFlowDef>(
-      org, "FlowDefinition",
-      "SELECT Id, DeveloperName, MasterLabel FROM FlowDefinition LIMIT 200",
-      true, // Tooling API
+    tryQuery<RawQueueSobject>(
+      org, "QueueSobject",
+      "SELECT QueueId, SobjectType FROM QueueSobject WHERE Queue.Type = 'Queue' LIMIT 500",
+    ),
+    // Query Flow directly with ProcessType filter — MasterLabel and ProcessType live on Flow, not FlowDefinition
+    tryQuery<RawFlowVersion>(
+      org, "Flow (RoutingFlow)",
+      "SELECT Id, DefinitionId, VersionNumber, MasterLabel FROM Flow WHERE ProcessType = 'RoutingFlow' AND Status = 'Active' ORDER BY DefinitionId, VersionNumber DESC LIMIT 100",
+      true,
     ),
   ]);
 
-  // Track unavailable objects — include the error message for debugging
-  for (const r of [channelRes, routingConfigRes, queueRoutingConfigRes, queueSobjectRes,
-    groupRes, groupMemberRes, serviceResourceSkillRes, skillRequirementRes, skillRes, flowDefRes]) {
-    if (!r.ok) unavailableObjects.push(`${r.object} (${r.error})`);
+  for (const r of [channelRes, queueRoutingConfigRes, groupRes, groupMemberRes,
+    serviceResourceRes, serviceResourceSkillRes, skillRequirementRes, skillRes,
+    queueSobjectRes, flowVersionRes]) {
+    if (!r.ok) unavailableObjects.push(`${r.object}: ${r.error}`);
   }
 
-  // ─── Build node maps ──────────────────────────────────────────────────────
+  // ─── Build nodes and edges ────────────────────────────────────────────────
 
   const nodes: TopologyNode[] = [];
   const edges: TopologyEdge[] = [];
@@ -173,57 +175,46 @@ export async function getTopologyGraph(org: OrgConnection): Promise<TopologyGrap
   }
 
   function addEdge(from: string, to: string, fromColumn: TopologyColumnId, toColumn: TopologyColumnId) {
-    const key = `${from}→${to}`;
     if (!edges.find((e) => e.from === from && e.to === to)) {
       edges.push({ from, to, fromColumn, toColumn });
     }
-    void key;
   }
 
-  // Service Channels
+  // ── Service Channels ──────────────────────────────────────────────────────
   const channels = channelRes.ok ? channelRes.records : [];
   for (const ch of channels) {
-    addNode({ id: ch.Id, label: ch.MasterLabel, columnId: "channel", meta: { channelType: ch.ChannelType } });
+    addNode({ id: ch.Id, label: ch.MasterLabel, columnId: "channel" });
   }
 
-  // Routing Configurations
-  const routingConfigs = routingConfigRes.ok ? routingConfigRes.records : [];
-  const routingConfigIds = new Set(routingConfigs.map((r) => r.Id));
-  for (const rc of routingConfigs) {
-    addNode({ id: rc.Id, label: rc.Name, columnId: "routingConfig", meta: { routingModel: rc.RoutingModel } });
+  // ── Routing Configs (QueueRoutingConfig) ──────────────────────────────────
+  const queueRoutingConfigs = queueRoutingConfigRes.ok ? queueRoutingConfigRes.records : [];
+  const routingConfigIds = new Set(queueRoutingConfigs.map((r) => r.Id));
+  for (const qrc of queueRoutingConfigs) {
+    addNode({
+      id: qrc.Id,
+      label: qrc.MasterLabel || qrc.DeveloperName,
+      columnId: "routingConfig",
+      meta: { routingModel: qrc.RoutingModel, skillsBased: qrc.IsAttributeBased, capacityWeight: qrc.CapacityWeight },
+    });
   }
 
-  // ServiceChannel → RoutingConfig edges
-  for (const ch of channels) {
-    if (ch.RoutingConfigurationId) addEdge(ch.Id, ch.RoutingConfigurationId, "channel", "routingConfig");
-  }
-
-  // Queues
+  // ── Queues — Group.QueueRoutingConfigId links queue → routing config ───────
   const groups = groupRes.ok ? groupRes.records : [];
   for (const g of groups) {
     addNode({ id: g.Id, label: g.Name, columnId: "queue" });
-  }
-
-  // Queue → RoutingConfig edges (via QueueRoutingConfig)
-  const queueRoutingConfigs = queueRoutingConfigRes.ok ? queueRoutingConfigRes.records : [];
-  for (const qrc of queueRoutingConfigs) {
-    if (qrc.QueueId && qrc.RoutingConfigId) {
-      addNode({ id: qrc.QueueId, label: qrc.QueueId, columnId: "queue" }); // ensure node exists
-      addEdge(qrc.QueueId, qrc.RoutingConfigId, "queue", "routingConfig");
+    if (g.QueueRoutingConfigId) {
+      addEdge(g.Id, g.QueueRoutingConfigId, "queue", "routingConfig");
     }
   }
 
-  // Queue → Object edges (via QueueSobject)
-  const queueSobjects = queueSobjectRes.ok ? queueSobjectRes.records : [];
+  // ── Queue → Object (via QueueSobject) ─────────────────────────────────────
   const objectLabels = new Map<string, string>([
-    ["Case", "Case"],
-    ["Lead", "Lead"],
-    ["VoiceCall", "Voice Call"],
-    ["MessagingSession", "Messaging Session"],
-    ["LiveChatTranscript", "Live Chat"],
-    ["ContactRequest", "Contact Request"],
-    ["SocialPost", "Social Post"],
+    ["Case", "Case"], ["Lead", "Lead"], ["VoiceCall", "Voice Call"],
+    ["MessagingSession", "Messaging Session"], ["LiveChatTranscript", "Live Chat"],
+    ["ContactRequest", "Contact Request"], ["SocialPost", "Social Post"],
+    ["SOSSession", "SOS"], ["ChatTranscript", "Chat"],
   ]);
+  const queueSobjects = queueSobjectRes.ok ? queueSobjectRes.records : [];
   for (const qs of queueSobjects) {
     if (!qs.QueueId || !qs.SobjectType) continue;
     const objId = `obj_${qs.SobjectType}`;
@@ -231,7 +222,7 @@ export async function getTopologyGraph(org: OrgConnection): Promise<TopologyGrap
     addEdge(qs.QueueId, objId, "queue", "object");
   }
 
-  // ServiceChannel → Object edges (via RelatedEntity)
+  // ── ServiceChannel → Object (via RelatedEntity) ───────────────────────────
   for (const ch of channels) {
     if (ch.RelatedEntity) {
       const objId = `obj_${ch.RelatedEntity}`;
@@ -240,88 +231,65 @@ export async function getTopologyGraph(org: OrgConnection): Promise<TopologyGrap
     }
   }
 
-  // Agents (deduplicated by UserId)
-  // Filter to Users only by ID prefix — polymorphic WHERE on GroupMember is not supported in REST SOQL
-  const agentUserIds = new Map<string, string>(); // userId → name
-  const groupMembers = groupMemberRes.ok ? groupMemberRes.records : [];
-  for (const gm of groupMembers) {
-    if (gm.UserOrGroupId.startsWith("005") && gm.UserOrGroup?.Name) {
-      agentUserIds.set(gm.UserOrGroupId, gm.UserOrGroup.Name);
-    }
-  }
-  for (const [userId, name] of Array.from(agentUserIds.entries())) {
-    addNode({ id: `agent_${userId}`, label: name, columnId: "agent" });
+  // ── Agents (ServiceResource, ResourceType = 'T') ──────────────────────────
+  const serviceResources = serviceResourceRes.ok ? serviceResourceRes.records : [];
+  // Map UserId → agent node id for joining GroupMember and ServiceResourceSkill
+  const userIdToAgentNodeId = new Map<string, string>();
+  for (const sr of serviceResources) {
+    const nodeId = `agent_${sr.Id}`;
+    userIdToAgentNodeId.set(sr.RelatedRecordId, nodeId);
+    addNode({ id: nodeId, label: sr.Name, columnId: "agent" });
   }
 
-  // Agent → Queue edges
+  // ── Agent → Queue (GroupMember joined to ServiceResource via UserId) ───────
+  const groupMembers = groupMemberRes.ok ? groupMemberRes.records : [];
   for (const gm of groupMembers) {
-    const agentNodeId = `agent_${gm.UserOrGroupId}`;
-    if (agentUserIds.has(gm.UserOrGroupId)) {
+    const agentNodeId = userIdToAgentNodeId.get(gm.UserOrGroupId);
+    if (agentNodeId) {
       addEdge(agentNodeId, gm.GroupId, "agent", "queue");
     }
   }
 
-  // Skills
+  // ── Skills ────────────────────────────────────────────────────────────────
   const skills = skillRes.ok ? skillRes.records : [];
   for (const s of skills) {
     addNode({ id: `skill_${s.Id}`, label: s.MasterLabel, columnId: "skill" });
   }
 
-  // Agent → Skill edges (via ServiceResourceSkill)
+  // ── Agent → Skill (ServiceResourceSkill) ─────────────────────────────────
   const serviceResourceSkills = serviceResourceSkillRes.ok ? serviceResourceSkillRes.records : [];
   for (const srs of serviceResourceSkills) {
     if (!srs.ServiceResource?.RelatedRecordId) continue;
-    const userId = srs.ServiceResource.RelatedRecordId;
-    const agentNodeId = `agent_${userId}`;
-    const skillNodeId = `skill_${srs.SkillId}`;
-    if (agentUserIds.has(userId)) {
+    const agentNodeId = userIdToAgentNodeId.get(srs.ServiceResource.RelatedRecordId);
+    if (agentNodeId) {
+      const skillNodeId = `skill_${srs.SkillId}`;
       addNode({ id: skillNodeId, label: srs.Skill?.MasterLabel ?? srs.SkillId, columnId: "skill" });
       addEdge(agentNodeId, skillNodeId, "agent", "skill");
     }
   }
 
-  // Skill → RoutingConfig edges (via SkillRequirement)
+  // ── Skill → RoutingConfig (SkillRequirement, filtered to QueueRoutingConfig IDs) ──
   const skillRequirements = skillRequirementRes.ok ? skillRequirementRes.records : [];
   for (const sr of skillRequirements) {
     if (!sr.RelatedRecordId || !sr.SkillId) continue;
-    if (!routingConfigIds.has(sr.RelatedRecordId)) continue; // filter to RoutingConfig rows only
+    if (!routingConfigIds.has(sr.RelatedRecordId)) continue;
     const skillNodeId = `skill_${sr.SkillId}`;
     addNode({ id: skillNodeId, label: sr.Skill?.MasterLabel ?? sr.SkillId, columnId: "skill" });
     addEdge(skillNodeId, sr.RelatedRecordId, "skill", "routingConfig");
   }
 
-  // Omni-Channel Flows + Flow → Queue edges
-  const flowDefs = flowDefRes.ok ? flowDefRes.records : [];
-  const flowsToFetch = flowDefs.slice(0, 20); // perf guard
+  // ── Flows (RoutingFlow, latest active version per definition) ─────────────
+  const flowVersions = flowVersionRes.ok ? flowVersionRes.records : [];
+  const seenDefs = new Set<string>();
+  const latestVersions = flowVersions.filter((v) => {
+    if (seenDefs.has(v.DefinitionId)) return false;
+    seenDefs.add(v.DefinitionId);
+    return true;
+  }).slice(0, 20); // perf cap — flow body fetches are sequential
 
-  // Fetch latest active version ID for each flow definition
-  type FlowVersionRow = { Id: string; DefinitionId: string; VersionNumber: number };
-  let flowVersions: FlowVersionRow[] = [];
-  if (flowsToFetch.length > 0) {
-    const defIds = flowsToFetch.map((f) => `'${f.Id}'`).join(",");
-    const versionRes = await tryQuery<FlowVersionRow>(
-      org, "Flow version",
-      `SELECT Id, DefinitionId, VersionNumber FROM Flow WHERE ProcessType = 'RoutingFlow' AND Status = 'Active' AND DefinitionId IN (${defIds}) ORDER BY DefinitionId, VersionNumber DESC LIMIT 100`,
-      true,
-    );
-    if (versionRes.ok) {
-      // Dedupe to latest per DefinitionId
-      const seen = new Set<string>();
-      flowVersions = versionRes.records.filter((v) => {
-        if (seen.has(v.DefinitionId)) return false;
-        seen.add(v.DefinitionId);
-        return true;
-      });
-    }
-  }
-
-  // Map definitionId → label
-  const flowDefLabels = new Map(flowDefs.map((f) => [f.Id, f.MasterLabel || f.DeveloperName]));
-
-  for (const version of flowVersions) {
-    const flowLabel = flowDefLabels.get(version.DefinitionId) ?? version.DefinitionId;
+  for (const version of latestVersions) {
     const flowNodeId = `flow_${version.DefinitionId}`;
-    addNode({ id: flowNodeId, label: flowLabel, columnId: "flow" });
+    addNode({ id: flowNodeId, label: version.MasterLabel || version.DefinitionId, columnId: "flow" });
 
     try {
       const flowRecord = await sfToolingGet<FlowRecord>(org, `/sobjects/Flow/${version.Id}`, 3600);
@@ -334,7 +302,7 @@ export async function getTopologyGraph(org: OrgConnection): Promise<TopologyGrap
         }
       }
     } catch {
-      // skip flows that can't be fetched
+      // skip flows whose body can't be fetched
     }
   }
 
