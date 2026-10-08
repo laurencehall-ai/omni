@@ -62,6 +62,10 @@ interface GroupRecord {
   Id: string;
   Name: string;
 }
+interface QueueRecord {
+  Id: string;
+  Name: string;
+}
 
 // Union type so we can try a query and handle failure without throwing
 type QueryResult<T> =
@@ -101,6 +105,7 @@ export async function getOrgSynopsis(
     presenceConfigRes,
     skillRes,
     userRes,
+    queueRes,
   ] = await Promise.all([
     tryQuery<ServiceChannelRecord>(
       org,
@@ -135,6 +140,11 @@ export async function getOrgSynopsis(
       "User (active)",
       "SELECT Id FROM User WHERE IsActive = true AND UserType = 'Standard' LIMIT 500",
     ),
+    tryQuery<QueueRecord>(
+      org,
+      "Queue",
+      "SELECT Id, Name FROM Group WHERE Type = 'Queue' LIMIT 200",
+    ),
   ]);
 
   // Collect names of objects that failed so the UI can show a warning
@@ -152,62 +162,58 @@ export async function getOrgSynopsis(
   const queueRoutingConfigs = queueRoutingConfigRes.ok
     ? queueRoutingConfigRes.records
     : null;
+  const allQueues = queueRes.ok ? queueRes.records : null;
   const presenceConfigs = presenceConfigRes.ok
     ? presenceConfigRes.records
     : null;
   const skills = skillRes.ok ? skillRes.records : [];
   const users = userRes.ok ? userRes.records : [];
 
-  // Resolve human-readable queue names for Omni queues found in QueueRoutingConfig
-  let queueMap = new Map<string, string>();
+  // Build queue list — prefer direct Group query (same source as topology),
+  // fall back to IDs extracted from QueueRoutingConfig if Group query failed
   const links: Array<{ queueId: string; routingConfigId: string }> = [];
 
-  if (queueRoutingConfigs && queueRoutingConfigs.length > 0) {
-    // Deduplicate queue IDs before fetching Group names
-    const omniQueueIds = Array.from(
-      new Set(queueRoutingConfigs.map((q) => q.QueueId).filter(Boolean)),
-    );
-    try {
-      const ids = omniQueueIds.map((id) => `'${id}'`).join(",");
-      const groups = await sfQuery<GroupRecord>(
-        org,
-        `SELECT Id, Name FROM Group WHERE Id IN (${ids})`,
-      );
-      queueMap = new Map(groups.map((g) => [g.Id, g.Name]));
-    } catch {
-      /* queue names fall back to IDs */
-    }
-
-    // Build the links array used by the SubwayMap to draw connections
+  if (queueRoutingConfigs) {
     for (const qrc of queueRoutingConfigs) {
       if (qrc.QueueId && qrc.RoutingConfigId) {
-        links.push({
-          queueId: qrc.QueueId,
-          routingConfigId: qrc.RoutingConfigId,
-        });
+        links.push({ queueId: qrc.QueueId, routingConfigId: qrc.RoutingConfigId });
       }
     }
   }
 
-  // Deduplicate queues from QueueRoutingConfig join records
-  const seenQueueIds = new Set<string>();
-  const queues: Array<{ id: string; name: string }> = [];
-  if (queueRoutingConfigs) {
+  let queues: Array<{ id: string; name: string }> | null = null;
+  if (allQueues !== null) {
+    // Direct Group query succeeded — use it (same data source as topology)
+    queues = allQueues.map((q) => ({ id: q.Id, name: q.Name }));
+  } else if (queueRoutingConfigs !== null) {
+    // Fall back: resolve names for the IDs we got from QueueRoutingConfig
+    const omniQueueIds = Array.from(
+      new Set(queueRoutingConfigs.map((q) => q.QueueId).filter(Boolean)),
+    );
+    let queueMap = new Map<string, string>();
+    if (omniQueueIds.length > 0) {
+      try {
+        const ids = omniQueueIds.map((id) => `'${id}'`).join(",");
+        const groups = await sfQuery<GroupRecord>(
+          org,
+          `SELECT Id, Name FROM Group WHERE Id IN (${ids})`,
+        );
+        queueMap = new Map(groups.map((g) => [g.Id, g.Name]));
+      } catch { /* names fall back to IDs */ }
+    }
+    const seen = new Set<string>();
+    queues = [];
     for (const qrc of queueRoutingConfigs) {
-      if (!seenQueueIds.has(qrc.QueueId)) {
-        seenQueueIds.add(qrc.QueueId);
-        queues.push({
-          id: qrc.QueueId,
-          name: queueMap.get(qrc.QueueId) ?? qrc.QueueId,
-        });
+      if (!seen.has(qrc.QueueId)) {
+        seen.add(qrc.QueueId);
+        queues.push({ id: qrc.QueueId, name: queueMap.get(qrc.QueueId) ?? qrc.QueueId });
       }
     }
   }
 
   return {
     channels: channels.map((c) => ({ id: c.Id, label: c.MasterLabel })),
-    // queues is null (not an empty array) when QueueRoutingConfig was inaccessible
-    queues: queueRoutingConfigs === null ? null : queues,
+    queues,
     routingConfigs:
       routingConfigs === null
         ? null
