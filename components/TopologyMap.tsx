@@ -37,27 +37,33 @@ export default function TopologyMap({ graph }: { graph: TopologyGraph }) {
     byColumn.get(node.columnId)?.push(node);
   }
 
-  // Measure node positions after render
+  // Measure node positions relative to the scrollable container.
+  // getBoundingClientRect is viewport-relative and breaks when scrolled —
+  // walk offsetLeft/offsetTop up to the container instead.
   const measureRects = useCallback(() => {
-    if (!containerRef.current) return;
-    const rects = new Map<string, DOMRect>();
-    containerRef.current.querySelectorAll<HTMLElement>("[data-node-id]").forEach((el) => {
-      const id = el.getAttribute("data-node-id")!;
-      rects.set(id, el.getBoundingClientRect());
-    });
-    const containerRect = containerRef.current.getBoundingClientRect();
-    // Translate to container-local coords
+    const container = containerRef.current;
+    if (!container) return;
+
+    function offsetRelativeTo(el: HTMLElement, ancestor: HTMLElement): { x: number; y: number } {
+      let x = 0, y = 0;
+      let cur: HTMLElement | null = el;
+      while (cur && cur !== ancestor) {
+        x += cur.offsetLeft;
+        y += cur.offsetTop;
+        cur = cur.offsetParent as HTMLElement | null;
+      }
+      return { x, y };
+    }
+
     const local = new Map<string, DOMRect>();
-    rects.forEach((r, id) => {
-      local.set(id, new DOMRect(
-        r.left - containerRect.left,
-        r.top - containerRect.top,
-        r.width,
-        r.height,
-      ));
+    container.querySelectorAll<HTMLElement>("[data-node-id]").forEach((el) => {
+      const id = el.getAttribute("data-node-id")!;
+      const { x, y } = offsetRelativeTo(el, container);
+      local.set(id, new DOMRect(x, y, el.offsetWidth, el.offsetHeight));
     });
+
     setNodeRects(local);
-    setSvgDims({ w: containerRect.width, h: containerRect.height });
+    setSvgDims({ w: container.scrollWidth, h: container.scrollHeight });
   }, []);
 
   useLayoutEffect(() => {
@@ -103,12 +109,13 @@ export default function TopologyMap({ graph }: { graph: TopologyGraph }) {
   }
 
   return (
+    <div className="overflow-x-auto">
     <div
       ref={containerRef}
-      className="relative overflow-x-auto"
-      style={{ minHeight: 200 }}
+      className="relative"
+      style={{ minHeight: 200, display: "inline-block", minWidth: "100%" }}
     >
-      {/* SVG edge layer — absolutely positioned over columns */}
+      {/* SVG edge layer — absolutely positioned, sized to full scroll area so edges reach all columns */}
       {svgDims.w > 0 && (
         <svg
           style={{ position: "absolute", top: 0, left: 0, width: svgDims.w, height: svgDims.h, pointerEvents: "none" }}
@@ -189,6 +196,7 @@ export default function TopologyMap({ graph }: { graph: TopologyGraph }) {
           Could not query: {graph.unavailableObjects.join(", ")} — some connections may be incomplete
         </p>
       )}
+    </div>
     </div>
   );
 }
