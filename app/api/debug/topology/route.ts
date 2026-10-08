@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getOrgOrThrow } from "@/lib/session";
 import { sfQuery, sfToolingQuery } from "@/lib/salesforce";
+import { OrgConnection } from "@/lib/types";
 
 interface ProbeResult {
   name: string;
@@ -13,7 +14,7 @@ interface ProbeResult {
 }
 
 async function probe(
-  org: Parameters<typeof sfQuery>[0],
+  org: OrgConnection,
   name: string,
   soql: string,
   tooling = false,
@@ -28,32 +29,48 @@ async function probe(
   }
 }
 
+async function describeObject(org: OrgConnection, objectName: string, tooling = false) {
+  const base = `${org.instanceUrl}/services/data/v62.0`;
+  const path = tooling
+    ? `${base}/tooling/sobjects/${objectName}/describe`
+    : `${base}/sobjects/${objectName}/describe`;
+  try {
+    const res = await fetch(path, {
+      headers: { Authorization: `Bearer ${org.accessToken}` },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      return { object: objectName, ok: false, error: `${res.status}: ${body.slice(0, 200)}` };
+    }
+    const data = await res.json() as { fields: Array<{ name: string; type: string; referenceTo: string[] }> };
+    const fields = data.fields.map((f) => `${f.name} (${f.type}${f.referenceTo?.length ? " → " + f.referenceTo.join(",") : ""})`);
+    return { object: objectName, ok: true, fieldCount: fields.length, fields };
+  } catch (e) {
+    return { object: objectName, ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export async function GET() {
   try {
     const org = await getOrgOrThrow();
 
-    const results = await Promise.all([
-      probe(org, "ServiceChannel",
-        "SELECT Id, MasterLabel, RelatedEntity, RoutingConfigurationId, ChannelType FROM ServiceChannel LIMIT 5"),
-      probe(org, "RoutingConfiguration (REST)",
-        "SELECT Id, Name, RoutingModel FROM RoutingConfiguration LIMIT 5"),
-      probe(org, "RoutingConfiguration (Tooling)",
-        "SELECT Id, Name, RoutingModel FROM RoutingConfiguration LIMIT 5", true),
-      probe(org, "GroupMember",
-        "SELECT GroupId, UserOrGroupId, UserOrGroup.Name FROM GroupMember WHERE Group.Type = 'Queue' LIMIT 5"),
-      probe(org, "FlowDefinition (Tooling)",
-        "SELECT Id, DeveloperName, MasterLabel FROM FlowDefinition LIMIT 5", true),
-      probe(org, "Flow RoutingFlow (Tooling)",
-        "SELECT Id, DefinitionId, VersionNumber FROM Flow WHERE ProcessType = 'RoutingFlow' AND Status = 'Active' LIMIT 5", true),
-      probe(org, "ServiceResourceSkill",
-        "SELECT ServiceResourceId, ServiceResource.RelatedRecordId, SkillId FROM ServiceResourceSkill WHERE ServiceResource.ResourceType = 'T' LIMIT 5"),
-      probe(org, "QueueRoutingConfig (REST)",
-        "SELECT Id, QueueId, RoutingConfigId FROM QueueRoutingConfig LIMIT 5"),
-      probe(org, "QueueRoutingConfig (Tooling)",
-        "SELECT Id, QueueId, RoutingConfigId FROM QueueRoutingConfig LIMIT 5", true),
+    const [probes, scDescribe, qrcDescribe] = await Promise.all([
+      Promise.all([
+        probe(org, "ServiceChannel (minimal)",
+          "SELECT Id, MasterLabel, RelatedEntity, ChannelType FROM ServiceChannel LIMIT 3"),
+        probe(org, "GroupMember users only",
+          "SELECT GroupId, UserOrGroupId FROM GroupMember WHERE Group.Type = 'Queue' LIMIT 10"),
+        probe(org, "Flow RoutingFlow (Tooling)",
+          "SELECT Id, DefinitionId, VersionNumber FROM Flow WHERE ProcessType = 'RoutingFlow' AND Status = 'Active' ORDER BY DefinitionId, VersionNumber DESC LIMIT 10", true),
+        probe(org, "QueueRoutingConfig exists",
+          "SELECT Id FROM QueueRoutingConfig LIMIT 1"),
+      ]),
+      describeObject(org, "ServiceChannel"),
+      describeObject(org, "QueueRoutingConfig"),
     ]);
 
-    return NextResponse.json({ results });
+    return NextResponse.json({ probes, describes: { ServiceChannel: scDescribe, QueueRoutingConfig: qrcDescribe } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     const status = msg.includes("No org connected") ? 401 : 500;
