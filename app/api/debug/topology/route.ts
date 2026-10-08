@@ -55,22 +55,42 @@ export async function GET() {
   try {
     const org = await getOrgOrThrow();
 
-    const [probes, scDescribe, qrcDescribe] = await Promise.all([
+    const [probes, groupDescribe, serviceResourceDescribe] = await Promise.all([
       Promise.all([
-        probe(org, "ServiceChannel (minimal)",
-          "SELECT Id, MasterLabel, RelatedEntity, ChannelType FROM ServiceChannel LIMIT 3"),
-        probe(org, "GroupMember users only",
-          "SELECT GroupId, UserOrGroupId FROM GroupMember WHERE Group.Type = 'Queue' LIMIT 10"),
-        probe(org, "Flow RoutingFlow (Tooling)",
-          "SELECT Id, DefinitionId, VersionNumber FROM Flow WHERE ProcessType = 'RoutingFlow' AND Status = 'Active' ORDER BY DefinitionId, VersionNumber DESC LIMIT 10", true),
-        probe(org, "QueueRoutingConfig exists",
-          "SELECT Id FROM QueueRoutingConfig LIMIT 1"),
+        // ServiceChannel without the bad fields
+        probe(org, "ServiceChannel",
+          "SELECT Id, MasterLabel, RelatedEntity FROM ServiceChannel LIMIT 3"),
+        // QueueRoutingConfig as the routing config object itself
+        probe(org, "QueueRoutingConfig (as RoutingConfig)",
+          "SELECT Id, MasterLabel, DeveloperName, RoutingModel, CapacityWeight, IsAttributeBased FROM QueueRoutingConfig LIMIT 5"),
+        // Group with a routing config reference field (if it exists)
+        probe(org, "Group with QueueRoutingConfigId",
+          "SELECT Id, Name, QueueRoutingConfigId FROM Group WHERE Type = 'Queue' LIMIT 5"),
+        // ServiceResource as the agent source (instead of GroupMember)
+        probe(org, "ServiceResource agents",
+          "SELECT Id, Name, RelatedRecordId FROM ServiceResource WHERE ResourceType = 'T' AND IsActive = true LIMIT 5"),
+        // ServiceResource → Queue via AgentWork (if any field exists)
+        probe(org, "ServiceResource queues",
+          "SELECT Id, Name, RelatedRecordId, QueueId FROM ServiceResource WHERE ResourceType = 'T' AND IsActive = true LIMIT 3"),
       ]),
-      describeObject(org, "ServiceChannel"),
-      describeObject(org, "QueueRoutingConfig"),
+      describeObject(org, "Group"),
+      describeObject(org, "ServiceResource"),
     ]);
 
-    return NextResponse.json({ probes, describes: { ServiceChannel: scDescribe, QueueRoutingConfig: qrcDescribe } });
+    // Filter Group describe to just reference fields for readability
+    const groupRefFields = groupDescribe.ok
+      ? (groupDescribe.fields as string[]).filter(f => f.includes("reference") || f.toLowerCase().includes("routing") || f.toLowerCase().includes("queue"))
+      : [];
+
+    const srRefFields = serviceResourceDescribe.ok
+      ? (serviceResourceDescribe.fields as string[]).filter(f => f.includes("reference") || f.toLowerCase().includes("routing") || f.toLowerCase().includes("queue"))
+      : [];
+
+    return NextResponse.json({
+      probes,
+      groupReferenceFields: groupRefFields,
+      serviceResourceReferenceFields: srRefFields,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     const status = msg.includes("No org connected") ? 401 : 500;
