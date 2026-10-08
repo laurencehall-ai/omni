@@ -1,32 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import dynamic from "next/dynamic";
 import { RoutingChain, RoutingLeg } from "@/lib/types";
 import { FlowGraphWithPath } from "@/lib/flow-types";
 import { formatDate, formatDuration } from "@/lib/utils";
 
-// ─── OmniFlow states ──────────────────────────────────────────────────────────
-// Defined before dynamic() so the loading fallback can reference OmniFlowSkeleton.
-
-function OmniFlowSkeleton() {
-  return (
-    <div className="h-[380px] bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl flex items-center justify-center">
-      <div className="flex flex-col items-center gap-2">
-        <div className="w-5 h-5 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs text-slate-400 dark:text-slate-500 font-mono">
-          Loading flow…
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ReactFlow must be client-only (no SSR). Loading fallback uses OmniFlowSkeleton.
-const OmniFlowDiagram = dynamic(() => import("./OmniFlowDiagram"), {
-  ssr: false,
-  loading: () => <OmniFlowSkeleton />,
-});
 
 // ─── Transfer type label ──────────────────────────────────────────────────────
 
@@ -241,10 +219,8 @@ interface FlowData {
 
 export default function RouteMap({ chain }: { chain: RoutingChain }) {
   const [flowData, setFlowData] = useState<FlowData | null>(null);
-  const [flowLoading, setFlowLoading] = useState(true);
 
   useEffect(() => {
-    setFlowLoading(true);
     fetch(`/api/flow?agentWorkId=${chain.entryAgentWorkId}`)
       .then((r) => r.json())
       .then((data: { notFound?: boolean; error?: string; graph?: FlowGraphWithPath; flowLabel?: string }) => {
@@ -252,12 +228,8 @@ export default function RouteMap({ chain }: { chain: RoutingChain }) {
           setFlowData({ graph: data.graph, flowLabel: data.flowLabel ?? null });
         }
       })
-      .catch(() => {/* silently omit diagram */})
-      .finally(() => setFlowLoading(false));
+      .catch(() => {/* silently omit */});
   }, [chain.entryAgentWorkId]);
-
-  // Show diagram block if: still loading, or a flow was found
-  const showFlowBlock = flowLoading || flowData !== null;
 
   return (
     <div className="space-y-3">
@@ -265,18 +237,6 @@ export default function RouteMap({ chain }: { chain: RoutingChain }) {
       <InboundBox chain={chain} flowData={flowData} />
 
       <Connector />
-
-      {/* Block 2: OmniFlow diagram — shown if a matching RoutingFlow exists */}
-      {showFlowBlock && (
-        <>
-          {flowLoading ? (
-            <OmniFlowSkeleton />
-          ) : flowData ? (
-            <OmniFlowDiagram graph={flowData.graph} flowLabel={flowData.flowLabel} />
-          ) : null}
-          {flowData && <Connector />}
-        </>
-      )}
 
       {/* Block 3: Routing Results — one per leg */}
       {chain.legs.map((leg, i) => {

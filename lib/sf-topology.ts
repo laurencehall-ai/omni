@@ -9,7 +9,7 @@ interface RawServiceChannel {
   Id: string;
   MasterLabel: string;
   RelatedEntity: string | null;
-  RoutingConfigId: string | null;
+  RoutingConfigurationId: string | null;
   ChannelType: string | null;
 }
 
@@ -17,8 +17,6 @@ interface RawRoutingConfig {
   Id: string;
   Name: string;
   RoutingModel: string | null;
-  IsAttributeBasedRouting: boolean | null;
-  CapacityWeight: number | null;
 }
 
 interface RawQueueRoutingConfig {
@@ -72,7 +70,7 @@ interface RawFlowDef {
 
 // ─── tryQuery ─────────────────────────────────────────────────────────────────
 
-type QueryResult<T> = { ok: true; records: T[] } | { ok: false; object: string };
+type QueryResult<T> = { ok: true; records: T[] } | { ok: false; object: string; error: string };
 
 async function tryQuery<T>(
   org: OrgConnection,
@@ -85,8 +83,8 @@ async function tryQuery<T>(
       ? await sfToolingQuery<T>(org, soql)
       : await sfQuery<T>(org, soql);
     return { ok: true, records };
-  } catch {
-    return { ok: false, object: objectName };
+  } catch (e) {
+    return { ok: false, object: objectName, error: e instanceof Error ? e.message : String(e) };
   }
 }
 
@@ -118,11 +116,11 @@ export async function getTopologyGraph(org: OrgConnection): Promise<TopologyGrap
   ] = await Promise.all([
     tryQuery<RawServiceChannel>(
       org, "ServiceChannel",
-      "SELECT Id, MasterLabel, RelatedEntity, RoutingConfigId, ChannelType FROM ServiceChannel LIMIT 100",
+      "SELECT Id, MasterLabel, RelatedEntity, RoutingConfigurationId, ChannelType FROM ServiceChannel LIMIT 100",
     ),
     tryQuery<RawRoutingConfig>(
       org, "RoutingConfiguration",
-      "SELECT Id, Name, RoutingModel, IsAttributeBasedRouting, CapacityWeight FROM RoutingConfiguration LIMIT 100",
+      "SELECT Id, Name, RoutingModel FROM RoutingConfiguration LIMIT 100",
     ),
     tryQuery<RawQueueRoutingConfig>(
       org, "QueueRoutingConfig",
@@ -138,7 +136,7 @@ export async function getTopologyGraph(org: OrgConnection): Promise<TopologyGrap
     ),
     tryQuery<RawGroupMember>(
       org, "GroupMember",
-      "SELECT GroupId, UserOrGroupId, UserOrGroup.Name FROM GroupMember WHERE Group.Type = 'Queue' AND UserOrGroup.Type = 'User' LIMIT 1000",
+      "SELECT GroupId, UserOrGroupId, UserOrGroup.Name FROM GroupMember WHERE Group.Type = 'Queue' LIMIT 1000",
     ),
     tryQuery<RawServiceResourceSkill>(
       org, "ServiceResourceSkill",
@@ -153,16 +151,16 @@ export async function getTopologyGraph(org: OrgConnection): Promise<TopologyGrap
       "SELECT Id, MasterLabel FROM Skill LIMIT 100",
     ),
     tryQuery<RawFlowDef>(
-      org, "FlowDefinition (RoutingFlow)",
-      "SELECT Id, DeveloperName, MasterLabel FROM FlowDefinition WHERE ProcessType = 'RoutingFlow' LIMIT 100",
+      org, "FlowDefinition",
+      "SELECT Id, DeveloperName, MasterLabel FROM FlowDefinition LIMIT 200",
       true, // Tooling API
     ),
   ]);
 
-  // Track unavailable objects
+  // Track unavailable objects — include the error message for debugging
   for (const r of [channelRes, routingConfigRes, queueRoutingConfigRes, queueSobjectRes,
     groupRes, groupMemberRes, serviceResourceSkillRes, skillRequirementRes, skillRes, flowDefRes]) {
-    if (!r.ok) unavailableObjects.push(r.object);
+    if (!r.ok) unavailableObjects.push(`${r.object} (${r.error})`);
   }
 
   // ─── Build node maps ──────────────────────────────────────────────────────
@@ -192,12 +190,12 @@ export async function getTopologyGraph(org: OrgConnection): Promise<TopologyGrap
   const routingConfigs = routingConfigRes.ok ? routingConfigRes.records : [];
   const routingConfigIds = new Set(routingConfigs.map((r) => r.Id));
   for (const rc of routingConfigs) {
-    addNode({ id: rc.Id, label: rc.Name, columnId: "routingConfig", meta: { routingModel: rc.RoutingModel, skillsBased: rc.IsAttributeBasedRouting } });
+    addNode({ id: rc.Id, label: rc.Name, columnId: "routingConfig", meta: { routingModel: rc.RoutingModel } });
   }
 
   // ServiceChannel → RoutingConfig edges
   for (const ch of channels) {
-    if (ch.RoutingConfigId) addEdge(ch.Id, ch.RoutingConfigId, "channel", "routingConfig");
+    if (ch.RoutingConfigurationId) addEdge(ch.Id, ch.RoutingConfigurationId, "channel", "routingConfig");
   }
 
   // Queues
@@ -243,10 +241,13 @@ export async function getTopologyGraph(org: OrgConnection): Promise<TopologyGrap
   }
 
   // Agents (deduplicated by UserId)
+  // Filter to Users only by ID prefix — polymorphic WHERE on GroupMember is not supported in REST SOQL
   const agentUserIds = new Map<string, string>(); // userId → name
   const groupMembers = groupMemberRes.ok ? groupMemberRes.records : [];
   for (const gm of groupMembers) {
-    if (gm.UserOrGroup?.Name) agentUserIds.set(gm.UserOrGroupId, gm.UserOrGroup.Name);
+    if (gm.UserOrGroupId.startsWith("005") && gm.UserOrGroup?.Name) {
+      agentUserIds.set(gm.UserOrGroupId, gm.UserOrGroup.Name);
+    }
   }
   for (const [userId, name] of Array.from(agentUserIds.entries())) {
     addNode({ id: `agent_${userId}`, label: name, columnId: "agent" });
