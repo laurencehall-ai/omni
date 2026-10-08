@@ -1,8 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { useTheme } from "@/lib/use-theme";
 import type { SynopsisData } from "@/lib/sf-synopsis";
+import type { TopologyGraph } from "@/lib/topology-types";
+import PsrHealthPanel from "@/components/PsrHealthPanel";
+
+const TopologyMap = dynamic(() => import("@/components/TopologyMap"), { ssr: false });
 
 interface SynopsisResponse {
   synopsis: SynopsisData;
@@ -201,6 +206,27 @@ export default function RouteMapPage() {
   const [data, setData] = useState<SynopsisResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [topoLoading, setTopoLoading] = useState(false);
+  const [topoData, setTopoData] = useState<TopologyGraph | null>(null);
+  const [topoError, setTopoError] = useState<string | null>(null);
+
+  async function generateTopology() {
+    setTopoLoading(true);
+    setTopoError(null);
+    try {
+      const res = await fetch("/api/topology");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Request failed (${res.status})`);
+      }
+      setTopoData(await res.json());
+    } catch (err) {
+      setTopoError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setTopoLoading(false);
+    }
+  }
+
   async function generate() {
     setLoading(true);
     setError(null);
@@ -233,6 +259,9 @@ export default function RouteMapPage() {
           Org-wide Omni-Channel configuration overview
         </p>
       </div>
+
+      {/* Health check — always visible, loads independently */}
+      <PsrHealthPanel />
 
       {!data && (
         <div className="flex flex-col items-center gap-4 py-12">
@@ -354,6 +383,59 @@ export default function RouteMapPage() {
           </p>
         </>
       )}
+
+      {/* Topology map — separate load */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 bg-brand-500 rounded-full" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">
+              Org Topology
+            </h2>
+            <span className="text-[9px] font-bold bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30 px-1.5 py-0.5 rounded font-mono uppercase tracking-wide">
+              beta
+            </span>
+          </div>
+          {!topoData && (
+            <button
+              onClick={generateTopology}
+              disabled={topoLoading}
+              className="text-xs font-mono px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-bold transition-colors"
+            >
+              {topoLoading ? "Building…" : "Generate Topology"}
+            </button>
+          )}
+          {topoData && (
+            <button
+              onClick={generateTopology}
+              disabled={topoLoading}
+              className="text-xs font-mono px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-40 transition-colors"
+            >
+              {topoLoading ? "Refreshing…" : "Refresh"}
+            </button>
+          )}
+        </div>
+
+        <div className="p-5">
+          {!topoData && !topoLoading && !topoError && (
+            <p className="text-xs text-slate-400 dark:text-slate-500 font-mono text-center py-6">
+              Maps all routing connections across your org — channels, configs, agents, skills, flows, queues, and objects.
+            </p>
+          )}
+          {topoLoading && (
+            <div className="flex items-center gap-2 py-8 justify-center">
+              <div className="w-4 h-4 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">Querying org topology…</span>
+            </div>
+          )}
+          {topoError && (
+            <div className="text-xs text-red-600 dark:text-red-400 font-mono bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3">
+              {topoError}
+            </div>
+          )}
+          {topoData && <TopologyMap graph={topoData} />}
+        </div>
+      </div>
     </div>
   );
 }

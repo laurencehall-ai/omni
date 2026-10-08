@@ -160,6 +160,31 @@ export default function AboutPage() {
         </div>
       </section>
 
+      {/* Phase 3 — OmniFlow diagram */}
+      <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6 space-y-3">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-1 h-4 bg-brand-500 rounded-full" />
+          <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">
+            OmniFlow diagram
+          </h2>
+        </div>
+        <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+          When a work item was routed through a Salesforce Omni-Channel Flow,
+          RouteCause fetches the flow definition from the Tooling API, parses
+          it into a graph, and renders an interactive diagram on the trace page.
+          The path the specific item took through the flow is highlighted — from
+          the start node through any check-availability or decision branches, to
+          the final route-work destination.
+        </p>
+        <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+          Path inference uses queue ID matching (high confidence), routing type
+          matching (medium), or single-routeWork fallback (low). The confidence
+          level is shown as a badge on the diagram. When a Copilot agent was
+          involved, the agent&apos;s configured name (e.g. &ldquo;Omega&rdquo;)
+          is surfaced rather than the generic platform label.
+        </p>
+      </section>
+
       {/* Beta features */}
       <section className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-700/50 rounded-xl p-6 space-y-4">
         <div className="flex items-center gap-2 mb-2">
@@ -173,38 +198,35 @@ export default function AboutPage() {
         </div>
         <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
           These features are functional but rely on data that is partially
-          available via the Salesforce REST API. They will improve as more data
-          sources become accessible.
+          available via the Salesforce REST and Tooling APIs. They will improve
+          as more data sources become accessible.
         </p>
 
         <div className="space-y-4">
           <div className="border-l-2 border-amber-400 pl-4">
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1">
-              RouteMap
+              OmniFlow diagram — complex multi-branch flows
             </p>
             <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              An org-wide overview of how your Omni-Channel configuration is
-              connected to your service organization — channels, queues, and
-              agents. RouteMap pulls your Service Channel definitions and shows
-              what routing infrastructure is active in your org. Future versions
-              will draw the full graph: which channels feed which queues, which
-              queues use which routing configurations, and which agents are
-              eligible to receive work from each queue.
+              The flow diagram is live and renders correctly for most flows. For
+              very complex flows with many decision branches or looping logic,
+              path inference may fall back to medium or low confidence. The
+              Routing Config field on the Inbound Interaction box is not yet
+              resolved (shows —) because RoutingConfig is not queryable via REST
+              in most production orgs.
             </p>
           </div>
 
           <div className="border-l-2 border-amber-400 pl-4">
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1">
-              Routing Map (on trace page)
+              RouteMap (org overview)
             </p>
             <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              A visual diagram — shown on every trace — of how your Salesforce
-              configuration influenced where the work item ended up. It shows
-              the channel it entered on, the queue it waited in, the routing
-              model that selected the agent, and any skills that were evaluated.
-              Tap any station on the map for details. This is beta because the
-              routing model and skill data available via AgentWork may not
-              capture every edge case in complex flow-based routing.
+              An org-wide overview of how your Omni-Channel configuration is
+              connected to your service organisation — channels, queues, and
+              agents. Future versions will draw the full graph: which channels
+              feed which queues, which queues use which routing configurations,
+              and which agents are eligible to receive work from each queue.
             </p>
           </div>
         </div>

@@ -6,13 +6,21 @@ Understand why Salesforce Omni-Channel routed a work item the way it did — and
 
 1. **Connect** your Salesforce org via OAuth (one-time setup)
 2. **Browse** recent AgentWork records with filters by channel, queue, and routing model
-3. **Trace** a work item — get a plain-English explanation of the routing decision
+3. **Trace** a work item — get the full routing chain: channel entry, OmniFlow diagram, routing results per leg
 4. **Verify** — mark the route as correct (👍) or incorrect (👎)
 5. **Fix** — if incorrect, specify where it should have gone and get a specific configuration suggestion
 
+## Trace page layout
+
+Each trace shows a three-block RouteMap:
+
+- **Inbound Interaction** — channel, routing type (sourced from the matched flow node, not AgentWork), platform key
+- **OmniFlow Diagram** — if a matching RoutingFlow is found via Tooling API, renders an interactive ReactFlow diagram with the inferred path highlighted. Confidence badge shows how the path was matched (queue ID / routing type / fallback). Copilot agent names (e.g. "Omega") are surfaced from the flow's `copilotLabel` input parameter.
+- **Routing Results** — one per leg, with queue, agent, timing, capacity weight
+
 ## Privacy
 
-RouteCause is designed with a hard rule: **customer data never leaves your org**. The tool only queries routing infrastructure metadata (AgentWork, RoutingConfiguration, ServiceChannel, Queue) and agent names. Work item records (Cases, Chats, etc.) are never fetched. Agent and routing data is sent to Claude to generate the explanation and suggestion.
+RouteCause is designed with a hard rule: **customer data never leaves your org**. The tool only queries routing infrastructure metadata (AgentWork, RoutingConfiguration, ServiceChannel, Queue, Flow) and agent names. Work item records (Cases, Chats, etc.) are never fetched or forwarded. Agent and routing data is sent to Claude to generate the explanation and suggestion.
 
 ## Setup
 
@@ -45,6 +53,8 @@ In your org: **Setup → App Manager → New Connected App**
 - OAuth Scopes: `api`, `refresh_token`, `offline_access`
 - Save, then copy the **Consumer Key** (Client ID) and **Consumer Secret**
 
+The connecting user needs read access to: AgentWork, ServiceChannel, Group (Queue), User, Skill, AgentWorkSkill, Flow (Tooling API), and optionally Case, VoiceCall, and MessagingSession for customer identifier lookup.
+
 ### 4. Run
 
 ```bash
@@ -65,6 +75,14 @@ Open [http://localhost:3000](http://localhost:3000) — you'll be prompted to co
 
 - Next.js 14 (App Router)
 - Tailwind CSS
-- iron-session (server-side session, httpOnly cookie)
+- iron-session v8 (server-side session, httpOnly cookie)
 - Anthropic SDK (claude-sonnet-4-6)
-- Salesforce REST API (SOQL)
+- Salesforce REST API v62.0 + Tooling API v62.0
+- ReactFlow v11.11.4 (OmniFlow diagram, client-only)
+
+## Key Salesforce API facts
+
+- `AgentWork.RoutingType` is always `'QueueBased'` even for Copilot/Flow-routed items — RouteCause never uses it to gate the flow lookup
+- Flow Metadata is fetched via `GET /tooling/sobjects/Flow/{id}` — the `Metadata` field contains the full graph (actionCalls, decisions, connectors)
+- `ProcessType = 'RoutingFlow'` is the correct filter for Omni-Channel routing flows; it lives on the `Flow` (version) object, not `FlowDefinition`
+- RoutingConfig, ServicePresenceConfig, and QueueRoutingConfig are not queryable via REST in most production orgs — those fields show `—`

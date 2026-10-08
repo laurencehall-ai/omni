@@ -37,12 +37,10 @@ function computeLayout(
   layer.set(startNodeName, 0);
   while (queue.length > 0) {
     const curr = queue.shift()!;
-    const currLayer = layer.get(curr) ?? 0;
+    const currLayer = layer.get(curr)!;
     for (const next of adj.get(curr) ?? []) {
-      const existing = layer.get(next);
-      const newLayer = currLayer + 1;
-      if (existing === undefined || existing < newLayer) {
-        layer.set(next, newLayer);
+      if (!layer.has(next)) {
+        layer.set(next, currLayer + 1);
         queue.push(next);
       }
     }

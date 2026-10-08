@@ -74,6 +74,28 @@ const REQUIREMENTS = [
     ],
   },
   {
+    category: "OmniFlow Diagram (Phase 3)",
+    items: [
+      "GET /api/flow?agentWorkId=X — fetches all active RoutingFlow versions via Tooling API, parses Metadata, infers path for the given AgentWork record",
+      "lib/flow-types.ts — raw Salesforce Flow Metadata interfaces (FlowActionCall, FlowDecision, FlowRule, FlowStart) and graph types (FlowNode, FlowEdge, ParsedFlowGraph, FlowGraphWithPath)",
+      "lib/flow-graph.ts — parseFlowGraph(): synthetic __start__ node, wires via startElementReference or start.connector.targetReference, processes actionCalls and decisions into nodes/edges",
+      "inferPath(): BFS from __start__ to matched routeWork node; match strategies: queue ID match (high confidence), routing type match (medium), single-routeWork fallback (low)",
+      "OmniFlowDiagram.tsx — ReactFlow v11.11.4 client-only component (ssr: false dynamic import); custom actionNode, startNode, decisionNode types defined outside component to avoid ReactFlow warnings",
+      "BFS layered layout: first-visit BFS assigns layer depth, nodes centered per layer; NODE_W=168 NODE_H=52 DIAMOND_W=80 H_GAP=48 V_GAP=80",
+      "On-path nodes: brand-500 blue borders; terminal routeWork node: green-500; off-path nodes: slate border + opacity-60",
+      "Diamond decision nodes via CSS rotate(45deg) with counter-rotated text label overlay",
+      "Confidence badge: 'Inferred path · {confidence} confidence' or 'Full flow — path not inferred'",
+      "Routing Type in InboundBox sourced from matched flow node's routingType inputParameter (not AgentWork.RoutingType, which is always 'QueueBased' even for Copilot/Flow-routed items)",
+      "Agent name in RoutingResultsBox sourced from matched routeWork node's copilotLabel inputParameter when present (e.g. 'Omega (AI)'), falling back to User.Name",
+      "Flow Metadata cached 1 hour via Next.js fetch revalidate — flow definitions change rarely",
+      "sfToolingGet<T>: direct REST GET against Tooling API for sObject records (e.g. /sobjects/Flow/{id} returns full Metadata field)",
+      "sfToolingQuery<T>: SOQL via Tooling API endpoint — required for Flow and other Setup objects",
+      "Key Salesforce discovery: ProcessType field lives on the Flow (version) object, correct value is 'RoutingFlow' — not on FlowDefinition, not 'OmniChannelFlow'",
+      "OmniFlowSkeleton defined before dynamic() call — loading fallback prop references it by closure, so ordering matters",
+      "flowData drives both the diagram and field enrichment in InboundBox and RoutingResultsBox; showFlowBlock hides the diagram section entirely if no matching RoutingFlow is found",
+    ],
+  },
+  {
     category: "RouteMap (Org Overview, Beta)",
     items: [
       "Org-wide stat cards: Service Channels, Queues, Skills, Active Users",
@@ -106,15 +128,16 @@ const REQUIREMENTS = [
   },
 ];
 
-const ONE_PASS_PROMPT = `Build a Next.js 14 App Router web application called "RouteCause" — a Salesforce Omni-Channel routing explainer.
+const ONE_PASS_PROMPT = `Build a Next.js 14 App Router web application called "RouteCause" — a Salesforce Omni-Channel routing explainer and post-incident audit tool.
 
 ## Core purpose
-Connect to a Salesforce org, show recent AgentWork records (routing decisions), click one to see a full routing chain in plain English, flag it if wrong, and get a concrete Salesforce config change suggestion.
+Connect to a Salesforce org, show recent AgentWork records (routing decisions), click one to see a full routing chain in plain English, flag it if wrong, and get a concrete Salesforce config change suggestion. For items that passed through an Omni-Channel Flow, render an interactive diagram of the flow with the inferred path highlighted.
 
 ## Tech stack
 - Next.js 14 App Router, TypeScript, Tailwind CSS (darkMode: "class")
 - iron-session v8 for encrypted httpOnly cookie sessions
-- Salesforce REST API v62.0 (no Metadata API)
+- Salesforce REST API v62.0 + Tooling API v62.0
+- ReactFlow v11.11.4 for the OmniFlow diagram (client-only, ssr: false)
 - Anthropic Claude claude-sonnet-4-6 for narration and suggestions — deterministic fallback if no key
 
 ## Authentication
@@ -163,6 +186,46 @@ The chain IS the map — a vertical event timeline replacing a separate diagram.
 - All others collapsed by default
 - Expand All / Collapse All toggle
 
+## Trace page layout (RouteMap component)
+The trace page renders a vertical RouteMap of three blocks:
+1. Inbound Interaction box (channel, routing type, platform key, routing config)
+2. OmniFlow diagram — shown only when a matching RoutingFlow is found (or loading)
+3. Routing Results box — one per leg, with queue, agent, timing, capacity
+
+Routing Type in the Inbound box is sourced from the matched flow node's routingType inputParameter — not AgentWork.RoutingType, which is always "QueueBased" even for Copilot-routed items. When a flow match exists, shows "{routingType} · via {flowLabel}".
+
+Agent name in Routing Results is sourced from the matched routeWork node's copilotLabel inputParameter when present (shows "Omega (AI)"), falling back to User.Name.
+
+## OmniFlow diagram (Phase 3)
+GET /api/flow?agentWorkId=X:
+1. Fetch AgentWork to get OriginalQueueId and RoutingType
+2. Fetch all active RoutingFlow versions via Tooling API (ProcessType = 'RoutingFlow', Status = 'Active'), deduped to latest per DefinitionId
+3. For each, fetch /tooling/sobjects/Flow/{id} (cached 1h) — returns full Metadata field
+4. parseFlowGraph(metadata): synthetic __start__ node, wire via startElementReference or start.connector.targetReference, process actionCalls + decisions into FlowNode/FlowEdge arrays
+5. inferPath(): BFS from __start__ to matched routeWork node; match strategies: queue ID match (high confidence), routing type match (medium), single-routeWork fallback (low)
+6. Return first match as { graph: FlowGraphWithPath, flowDeveloperName, flowLabel }
+
+### FlowNode kinds
+start | checkAvailability | routeWork | playPrompt | screenPop | decision | other
+
+### routeWork node carries
+queueId, queueLabel, routingType, copilotLabel (from inputParameters)
+
+### OmniFlowDiagram component (ReactFlow v11)
+- ssr: false dynamic import — ReactFlow requires browser APIs
+- OmniFlowSkeleton defined BEFORE dynamic() call — loading callback closes over it
+- Custom node types (actionNode, startNode, decisionNode) defined OUTSIDE component to avoid ReactFlow re-registration warnings
+- BFS layered layout: first-visit BFS assigns layer depth; nodes centered per layer
+  NODE_W=168, NODE_H=52, DIAMOND_W=80, H_GAP=48, V_GAP=80
+- On-path nodes: brand-500 blue border; terminal routeWork: green-500; off-path: slate + opacity-60
+- Decision nodes: CSS rotate(45deg) diamond with counter-rotated text label
+- Confidence badge: "Inferred path · {confidence} confidence" or "Full flow — path not inferred"
+
+### Key Salesforce Tooling API facts (hard-won)
+- ProcessType field is on the Flow (version) object, NOT FlowDefinition — correct value is 'RoutingFlow'
+- FlowElement and FlowConnector are NOT queryable via SOQL — get full Metadata via REST GET on /tooling/sobjects/Flow/{id}
+- AgentWork.RoutingType is always 'QueueBased' even for Copilot/Flow-routed items — do NOT gate flow fetch on this field
+
 ## Trace page header
 - h1: "Case {number}" if available, else "{workItemType} ···{last-6 of sfWorkItemId}"
 - Pill strip: channel · phone/descriptor · N legs (if >1) · escalating agent name (if escalated) · outcome pill · final agent · timestamp
@@ -172,13 +235,14 @@ The chain IS the map — a vertical event timeline replacing a separate diagram.
 ## Pages & routes
 - /connect — OAuth connect form
 - /work-items — sortable, searchable AgentWork list. Day-range filter (24h/7d/30d) → localStorage rc-days-filter. Green ✓ / red ✗ badges from rc-validations / rc-flagged.
-- /trace/[id] — full trace page using RoutingChain. Accordion timeline. Pill strip header. Full Explanation (collapsible). Raw data panel with clickable SF record links. Verdict buttons. SubwayMap at bottom (collapsible, default collapsed).
+- /trace/[id] — full trace page using RoutingChain. RouteMap (Inbound + OmniFlow diagram + Routing Results). Accordion timeline. Pill strip header. Full Explanation (collapsible). Raw data panel with clickable SF record links. Verdict buttons. SubwayMap at bottom (collapsible, default collapsed).
 - /synopsis — org-wide stat cards (channels, queues, skills, users) with hover tooltips for Setup paths. Shows — for objects not queryable via REST. AI narration of org config.
 - /about — what RouteCause does, Connected App setup guide, beta features.
 - /data-privacy — full honest data handling disclosure.
 - /omni-channel — Omni-Channel overview and best practices reference.
 - /made-with — this page (requirements + one-pass prompt).
 - /api/trace?id= — GET, returns { chain, narration }
+- /api/flow?agentWorkId= — GET, returns { graph: FlowGraphWithPath, flowDeveloperName, flowLabel } or { notFound, reason }
 - /api/work-items — GET, returns WorkItemRow[] with customer enrichment
 - /api/suggest — POST, returns ConfigSuggestion
 - /api/synopsis — GET, returns synopsis data + narration
@@ -191,6 +255,7 @@ The chain IS the map — a vertical event timeline replacing a separate diagram.
 - AgentWorkSkill has no relationshipName — query it separately, never as a subquery
 - VoiceCall has no Status column — do not query it
 - Group WHERE Type = 'Queue' returns ALL queues, not just Omni-Channel queues
+- AgentWork.RoutingType is always 'QueueBased' even for flow-routed items — never use it to gate flow lookup
 
 ## UI details
 - Header: dark gradient (slate-900 → brand-700 → slate-900), road-sign SVG logo, RouteCause wordmark, v1 badge, Live dot, ThemeToggle

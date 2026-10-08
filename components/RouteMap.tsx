@@ -22,19 +22,6 @@ function OmniFlowSkeleton() {
   );
 }
 
-function OmniFlowPlaceholder() {
-  return (
-    <div className="bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-6 text-center">
-      <p className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
-        Omni-Channel Flow
-      </p>
-      <p className="text-xs text-slate-500 dark:text-slate-500 leading-relaxed max-w-xs mx-auto">
-        Flow diagram could not be loaded for this work item.
-      </p>
-    </div>
-  );
-}
-
 // ReactFlow must be client-only (no SSR). Loading fallback uses OmniFlowSkeleton.
 const OmniFlowDiagram = dynamic(() => import("./OmniFlowDiagram"), {
   ssr: false,
@@ -80,11 +67,26 @@ function FieldRow({ label, value }: { label: string; value: string | null }) {
 
 // ─── Inbound Interaction box ──────────────────────────────────────────────────
 
-function InboundBox({ chain }: { chain: RoutingChain }) {
+function InboundBox({ chain, flowData }: { chain: RoutingChain; flowData: FlowData | null }) {
   const leg = chain.legs[0];
+
+  // Prefer the routing type from the matched flow node (more accurate than AgentWork.RoutingType)
+  let routingTypeLabel = leg?.routingType ?? "—";
+  if (flowData) {
+    const matchedNode = flowData.graph.nodes.find(
+      (n) => n.name === flowData.graph.matchedRouteWorkName,
+    );
+    if (matchedNode?.routingType) {
+      routingTypeLabel = matchedNode.routingType;
+    }
+    if (flowData.flowLabel) {
+      routingTypeLabel += ` · via ${flowData.flowLabel}`;
+    }
+  }
+
   const rows: { label: string; value: string | null }[] = [
     { label: "Channel", value: leg?.channelLabel ?? "—" },
-    { label: "Routing Type", value: leg?.routingType ?? "—" },
+    { label: "Routing Type", value: routingTypeLabel },
     { label: "Platform Key", value: chain.customer?.phone ?? "—" },
     { label: "Routing Config", value: "—" },
   ];
@@ -110,19 +112,28 @@ function RoutingResultsBox({
   legIndex,
   totalLegs,
   instanceUrl,
+  copilotLabel,
 }: {
   leg: RoutingLeg;
   legIndex: number;
   totalLegs: number;
   instanceUrl: string;
+  copilotLabel?: string | null;
 }) {
   const sfLink = `${instanceUrl}/lightning/r/AgentWork/${leg.agentWorkId}/view`;
+
+  // When the flow node names a Copilot agent, prefer that over the generic "Automated Process" name
+  const agentDisplay = copilotLabel
+    ? `${copilotLabel} (AI)`
+    : leg.isAI
+      ? `${leg.agentName} (AI)`
+      : leg.agentName;
 
   const rows: { label: string; value: string | null }[] = [
     { label: "Queue / Skill(s)", value: leg.queueName || "—" },
     {
       label: "Agent",
-      value: leg.isAI ? `${leg.agentName} (AI)` : leg.agentName,
+      value: agentDisplay,
     },
     {
       label: "Date / Time",
@@ -251,7 +262,7 @@ export default function RouteMap({ chain }: { chain: RoutingChain }) {
   return (
     <div className="space-y-3">
       {/* Block 1: Inbound Interaction */}
-      <InboundBox chain={chain} />
+      <InboundBox chain={chain} flowData={flowData} />
 
       <Connector />
 
@@ -268,7 +279,16 @@ export default function RouteMap({ chain }: { chain: RoutingChain }) {
       )}
 
       {/* Block 3: Routing Results — one per leg */}
-      {chain.legs.map((leg, i) => (
+      {chain.legs.map((leg, i) => {
+        // Resolve copilot name from matched flow node (first leg only)
+        let copilotLabel: string | null = null;
+        if (i === 0 && flowData) {
+          const matchedNode = flowData.graph.nodes.find(
+            (n) => n.name === flowData.graph.matchedRouteWorkName,
+          );
+          copilotLabel = matchedNode?.copilotLabel ?? null;
+        }
+        return (
         <div key={leg.agentWorkId}>
           {i > 0 && <TransferBadge from={chain.legs[i - 1]} to={leg} />}
           <RoutingResultsBox
@@ -276,9 +296,11 @@ export default function RouteMap({ chain }: { chain: RoutingChain }) {
             legIndex={i}
             totalLegs={chain.legs.length}
             instanceUrl={chain.instanceUrl}
+            copilotLabel={copilotLabel}
           />
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
